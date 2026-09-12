@@ -30,6 +30,7 @@ This document is scoped to the same MVP as the PRD/TRD: every table here is buil
 ## 2. Conventions
 
 - **Primary keys are UUIDs** (`uuid` type, `gen_random_uuid()` default via the `pgcrypto` extension), not serial integers. This is not a stylistic choice: TRD §9 requires the field-survey app to generate a UUID client-side at capture time so a retried background sync can upsert idempotently instead of creating duplicates. Making every PK a UUID means the same pattern works uniformly — a client can pre-assign an ID before it ever reaches the server — rather than surveys being a special case.
+- **Human-readable display codes get their own column, separate from the UUID primary key.** Per CLAUDE.md's ID conventions (`ZN-01` zones, `HH-112` households, `SH-01` shelters, `MV-118` relocation records, `SV-4471` surveys, `HO-221` handoffs, `RT-07` routes), `zones`, `households`, `shelters`, `relocation_records`, `surveys`, `handoff_logs`, and `routes` each carry a `display_code text unique` column (added in migration `0002`, not present in the original v1.0 DDL below until this revision). The application assigns the next code in sequence per table at creation time; the column is not a generated/computed value.
 - **Every table** carries `created_at timestamptz not null default now()` and `updated_at timestamptz not null default now()`, the latter maintained by a shared trigger (`set_updated_at()`), except `audit_log`, which is append-only and carries only `created_at`.
 - **All geometry columns use PostGIS `geometry` types in SRID 4326** (WGS84 lat/lng), matching Bhuvan/GSI/OSM source data (TRD §8, §4) with no reprojection step needed at ingestion.
 - **Enumerated states use native Postgres `ENUM` types**, not free-text columns with a check constraint maintained elsewhere — this keeps invalid states (e.g., a relocation record with a typo'd status) impossible at the database level rather than caught later in application code.
@@ -187,6 +188,7 @@ create index idx_users_role on users(role);
 ```sql
 create table zones (
   zone_id uuid primary key default gen_random_uuid(),
+  display_code text unique,
   district_id uuid not null references districts(district_id),
   name text not null,
   geom geometry(Polygon, 4326) not null,
@@ -222,6 +224,7 @@ create index idx_zones_hazard_types on zones using gin (hazard_types);
 ```sql
 create table households (
   household_id uuid primary key default gen_random_uuid(),
+  display_code text unique,
   zone_id uuid not null references zones(zone_id),
   geom geometry(Point, 4326) not null,
   population_count integer not null default 0 check (population_count >= 0),
@@ -256,6 +259,7 @@ create index idx_households_confidence on households(data_confidence);
 ```sql
 create table shelters (
   shelter_id uuid primary key default gen_random_uuid(),
+  display_code text unique,
   district_id uuid not null references districts(district_id),
   name text not null,
   geom geometry(Point, 4326) not null,
@@ -280,6 +284,7 @@ The capacity check is enforced at the database level, not just the Shelter & All
 ```sql
 create table surveys (
   survey_id uuid primary key,
+  display_code text unique,
   zone_id uuid not null references zones(zone_id),
   household_id uuid references households(household_id),
   officer_id uuid not null references users(user_id),
@@ -349,6 +354,7 @@ create index idx_escorts_status on escorts(status);
 ```sql
 create table routes (
   route_id uuid primary key default gen_random_uuid(),
+  display_code text unique,
   origin_geom geometry(Point, 4326) not null,
   dest_geom geometry(Point, 4326) not null,
   path geometry(LineString, 4326) not null,
@@ -369,6 +375,7 @@ create index idx_routes_path on routes using gist (path);
 ```sql
 create table relocation_records (
   record_id uuid primary key default gen_random_uuid(),
+  display_code text unique,
   household_id uuid not null references households(household_id),
   shelter_id uuid not null references shelters(shelter_id),
   route_id uuid references routes(route_id),
@@ -460,6 +467,7 @@ create index idx_zone_assignments_zone on user_zone_assignments(zone_id);
 ```sql
 create table handoff_logs (
   log_id uuid primary key default gen_random_uuid(),
+  display_code text unique,
   need_type text not null,
   agency text not null,
   status handoff_status not null default 'open',
@@ -622,6 +630,7 @@ PRD §10 and TRD §10 require household-level vulnerability data restricted to a
 
 ```sql
 alter table households enable row level security;
+alter table households force row level security;
  
 create policy household_access on households
   using (
@@ -631,9 +640,35 @@ create policy household_access on households
       where user_id = current_setting('app.current_user_id', true)::uuid
     )
   );
+ 
+alter table zones enable row level security;
+alter table zones force row level security;
+ 
+create policy zone_access on zones
+  using (
+    current_setting('app.current_role', true) in ('sdma_official', 'control_room')
+    or zone_id in (
+      select zone_id from user_zone_assignments
+      where user_id = current_setting('app.current_user_id', true)::uuid
+    )
+  );
+ 
+alter table surveys enable row level security;
+alter table surveys force row level security;
+ 
+create policy survey_access on surveys
+  using (
+    current_setting('app.current_role', true) in ('sdma_official', 'control_room')
+    or zone_id in (
+      select zone_id from user_zone_assignments
+      where user_id = current_setting('app.current_user_id', true)::uuid
+    )
+  );
 ```
 
-`app.current_role` and `app.current_user_id` are set per-connection by the FastAPI request middleware from the JWT (TRD §10) before any query runs. The same pattern applies to `surveys` (an officer should only see submissions for their assigned zones) and `zones` (an officer's map view is naturally scoped to what they're assigned to survey, per TRD §7.10's prioritized survey queue). `sdma_official` and `control_room` bypass the zone filter entirely, matching their "full dashboard access" / "read-only dashboard access during active events" roles (TRD §10).
+`app.current_role` and `app.current_user_id` are set per-connection by the FastAPI request middleware from the JWT (TRD §10) before any query runs, via `select set_config('app.current_role', ..., true)` (transaction-scoped, parameterized — not string-interpolated into a `SET LOCAL` statement). The same policy shape applies to `zones` (an officer's map view is naturally scoped to what they're assigned to survey, per TRD §7.10's prioritized survey queue) and `surveys` (an officer only sees submissions for their assigned zones). `sdma_official` and `control_room` bypass the zone filter entirely, matching their "full dashboard access" / "read-only dashboard access during active events" roles (TRD §10).
+
+**`FORCE ROW LEVEL SECURITY` is not optional here, and neither is a dedicated application role.** Postgres table owners — and superusers, unconditionally — bypass RLS policies by default; `FORCE ROW LEVEL SECURITY` closes the owner loophole but still does nothing for a superuser. The Docker Compose `POSTGRES_USER` (`ps191`) is created as a Postgres superuser and owns every table (it runs the Alembic migrations), so if the FastAPI app connected as `ps191`, every policy above would compile and silently do nothing — exactly the undetectable-in-a-demo failure mode rule 7 warns about. Migration `0002` therefore creates a second, non-superuser role, `app_user`, granted only `SELECT`/`INSERT`/`UPDATE` on the schema (`SELECT`/`INSERT` only on `audit_log`, per rule 2) and no `BYPASSRLS` attribute. `ps191` remains the migration/owner connection (`MIGRATION_DATABASE_URL`, used only by Alembic); the running application and the seed script connect as `app_user` (`DATABASE_URL`). Both are set in `docker-compose.yml`/`.env`.
 
 ## 8. Indexing Summary
 
