@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dima Hasao district — hazard zones</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+  html,body{margin:0;height:100%;background:#070d1c;transition:background .25s ease;font-family:'Schibsted Grotesk',system-ui,sans-serif}
+  #map{position:absolute;inset:0}
+  .leaflet-container{background:#070d1c;font-family:'IBM Plex Mono',ui-monospace,monospace}
+  body[data-theme="light"],body[data-theme="light"] .leaflet-container{background:#E7EBF1}
+  body[data-theme="dark"] .leaflet-tile-pane{filter:invert(1) hue-rotate(185deg) brightness(.86) contrast(.88) saturate(.5)}
+  body[data-esri="1"] .leaflet-tile-pane{filter:none}
+  body[data-theme="dark"] .leaflet-control-attribution{background:rgba(10,16,32,.82)!important;color:#8d9cb8!important}
+  body[data-theme="dark"] .leaflet-control-attribution a{color:#7fe3f7!important}
+  body[data-theme="dark"] .leaflet-bar a{background:#0d1426;color:#c6d2e8;border-color:#1d2a45}
+  .leaflet-control-attribution{font:400 9.5px/1.4 'IBM Plex Mono',monospace}
+  .zlab{font:600 10px/1 'IBM Plex Mono',monospace;white-space:nowrap;padding:3px 5px;border-radius:3px;border:1px solid;pointer-events:none}
+  .leaflet-popup-content-wrapper{border-radius:5px}
+  .pop{font:400 11px/1.5 'IBM Plex Mono',monospace}
+  .pop b{font:600 12px/1.4 'Schibsted Grotesk',sans-serif;display:block;margin-bottom:3px}
+  #cap{position:absolute;left:10px;bottom:22px;z-index:500;font:400 9.5px/1.45 'IBM Plex Mono',monospace;padding:5px 7px;border-radius:3px;pointer-events:none;max-width:62%}
+  #fallback{position:absolute;inset:0;overflow-y:auto;box-sizing:border-box}
+</style>
+</head>
+<body data-theme="dark">
+<div id="map"></div>
+<div id="cap"></div>
+<script>
+const MODE = new URLSearchParams(location.search).get('mode') || 'zones';
+const SEV = {
+  dark:{immediate:'#B80C09', short:'#FD9E02', medium:'#8FC93A', shelter:'#06BEE1', blocked:'#DB222A',
+        suspect:'#FD9E02', clear:'#32E875', labInk:'#e9eef8', labBg:'rgba(10,16,32,.86)', labBorder:'#2a3b5e',
+        capInk:'#7c8db0', capBg:'rgba(7,13,28,.8)'},
+  light:{immediate:'#D32E22', short:'#D98F1F', medium:'#C9A93A', shelter:'#2F6FE0', blocked:'#D32E22',
+        suspect:'#D98F1F', clear:'#2E8A7D', labInk:'#0F1620', labBg:'rgba(255,255,255,.92)', labBorder:'#C8D1DE',
+        capInk:'#55637A', capBg:'rgba(244,246,249,.85)'}
+};
+const PANEL = {
+  dark:{bg:'#070d1c', card:'#0d1426', border:'#1d2a45', ink:'#e9eef8', ink3:'#8d9cb8', ink4:'#7c8db0'},
+  light:{bg:'#E7EBF1', card:'#FFFFFF', border:'#DDE3EC', ink:'#0F1620', ink3:'#4C596C', ink4:'#5C6878'}
+};
+let theme = 'dark';
+const P = () => SEV[theme];
+
+// Real settlements in Dima Hasao (North Cachar Hills), Assam.
+const ZONES = [
+  {id:'ZN-01', name:'Upper Ridge',   near:'Haflong ridge',    tier:'immediate', c:[25.1780,93.0280], r:0.019, haz:'Landslide',            pop:412,  risk:88},
+  {id:'ZN-02', name:'Riverbend East',near:'Maibang',          tier:'immediate', c:[25.3020,93.1350], r:0.027, haz:'Riverine flood',       pop:1240, risk:81},
+  {id:'ZN-03', name:'Slate Quarry',  near:'Jatinga',          tier:'immediate', c:[25.1215,92.9855], r:0.016, haz:'Landslide + cloudburst',pop:268,  risk:76},
+  {id:'ZN-04', name:'Mill Colony',   near:'Maibang south',    tier:'short',     c:[25.2830,93.1520], r:0.022, haz:'Riverine flood',       pop:890,  risk:54},
+  {id:'ZN-05', name:'Terrace Block', near:'Haflong west',     tier:'short',     c:[25.1575,92.9975], r:0.017, haz:'Landslide',            pop:305,  risk:47},
+  {id:'ZN-06', name:'North Spur',    near:'Umrangso',         tier:'medium',    c:[25.4620,92.7060], r:0.017, haz:'Cloudburst',           pop:176,  risk:33},
+  {id:'ZN-07', name:'Canal Fringe',  near:'Diyungbra',        tier:'medium',    c:[25.3780,93.0550], r:0.020, haz:'Riverine flood',       pop:522,  risk:28},
+  {id:'ZN-08', name:'Pine Hollow',   near:'Harangajao',       tier:'medium',    c:[25.0340,92.9620], r:0.016, haz:'Landslide',            pop:143,  risk:19}
+];
+const SHELTERS = [
+  {id:'SH-01', name:'Ridge Higher Secondary School', c:[25.1700,93.0205]},
+  {id:'SH-02', name:'Block Community Hall',          c:[25.3035,93.1255]},
+  {id:'SH-03', name:'District Stadium Ground',       c:[25.1620,93.0115]},
+  {id:'SH-04', name:'Block Office Complex',          c:[25.4650,92.7020]},
+  {id:'SH-05', name:'Tea Estate Godown',             c:[25.0320,92.9580]}
+];
+// RT-07: Upper Ridge -> SH-01, four segments.
+const ROUTE = [
+  {status:'clear',   pts:[[25.1780,93.0280],[25.1762,93.0262],[25.1745,93.0248]]},
+  {status:'blocked', pts:[[25.1745,93.0248],[25.1728,93.0238],[25.1716,93.0229]]},
+  {status:'suspect', pts:[[25.1716,93.0229],[25.1708,93.0216],[25.1703,93.0208]]},
+  {status:'clear',   pts:[[25.1703,93.0208],[25.1700,93.0205]]}
+];
+const ALT = [[25.1780,93.0280],[25.1795,93.0245],[25.1778,93.0196],[25.1742,93.0168],[25.1706,93.0185],[25.1700,93.0205]];
+
+function poly(c, r) {
+  const out = [];
+  for (let i = 0; i < 7; i++) {
+    const a = i / 7 * Math.PI * 2;
+    const j = 0.72 + ((i * 37) % 11) / 22;      // deterministic irregularity
+    out.push([c[0] + Math.sin(a) * r * j * 0.62, c[1] + Math.cos(a) * r * j]);
+  }
+  return out;
+}
+
+let map, tileLayer;
+const layers = {}, labels = {};
+let selected = null;
+let fallbackActive = false;
+let tileKind = 'osm';
+let tileLoadCount = 0, tileErrorCount = 0, healthTimer = null;
+const OSM_URL = 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png';
+const esriUrl = () => theme === 'light'
+  ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+  : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+
+function setTileLayer(kind) {
+  tileKind = kind;
+  if (tileLayer) map.removeLayer(tileLayer);
+  if (kind === 'esri') {
+    document.body.dataset.esri = '1';
+    tileLayer = L.tileLayer(esriUrl(), { attribution: 'Tiles © Esri', maxZoom: 16 }).addTo(map);
+  } else {
+    document.body.dataset.esri = '';
+    tileLayer = L.tileLayer(OSM_URL, { attribution: '© OpenStreetMap contributors', maxZoom: 18, subdomains: 'abc' }).addTo(map);
+  }
+  bindTileHealth(tileLayer);
+}
+
+function bindTileHealth(layer) {
+  tileLoadCount = 0; tileErrorCount = 0;
+  layer.on('load', () => { tileLoadCount++; });
+  layer.on('tileerror', () => { tileErrorCount++; if (tileErrorCount >= 6) escalate(); });
+  clearTimeout(healthTimer);
+  healthTimer = setTimeout(() => { if (tileLoadCount === 0) escalate(); }, 5000);
+}
+
+function escalate() {
+  if (fallbackActive) return;
+  if (tileKind === 'osm') setTileLayer('esri');
+  else renderFallback();
+}
+
+function renderFallback() {
+  fallbackActive = true;
+  document.getElementById('cap').style.display = 'none';
+  const pal = PANEL[theme];
+  const rows = ZONES.map(z => (
+    '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid ' + pal.border + '">' +
+      '<span style="width:10px;height:10px;border-radius:2px;flex:none;background:' + P()[z.tier] + '"></span>' +
+      '<span style="flex:none;width:56px;font:600 11px/1 \'IBM Plex Mono\',monospace;color:' + pal.ink + '">' + z.id + '</span>' +
+      '<span style="flex:1;min-width:0;font:500 12.5px/1.3 \'Schibsted Grotesk\',sans-serif;color:' + pal.ink + '">' + z.name + '</span>' +
+      '<span style="flex:none;font:400 11px/1.3 \'Schibsted Grotesk\',sans-serif;color:' + pal.ink3 + '">' + z.haz + '</span>' +
+      '<span style="flex:none;width:36px;text-align:right;font:600 13px/1 \'IBM Plex Mono\',monospace;color:' + P()[z.tier] + '">' + z.risk + '</span>' +
+    '</div>'
+  )).join('');
+  document.getElementById('map').innerHTML =
+    '<div id="fallback" style="background:' + pal.bg + '">' +
+      '<div style="padding:14px 14px 10px;font:500 10.5px/1.4 \'IBM Plex Mono\',monospace;letter-spacing:.04em;color:' + pal.ink4 + '">Basemap unavailable — zone data shown as list.</div>' +
+      '<div style="margin:0 14px 14px;border:1px solid ' + pal.border + ';border-radius:6px;overflow:hidden;background:' + pal.card + '">' + rows + '</div>' +
+    '</div>';
+}
+
+function drawZones() {
+  ZONES.forEach(z => {
+    const col = P()[z.tier];
+    const g = L.polygon(poly(z.c, z.r), {
+      color: col, weight: 1.6, opacity: .95, fillColor: col, fillOpacity: .26, className: 'zpoly'
+    }).addTo(map);
+    g.on('click', () => { select(z.id); parent.postMessage({ src:'dh-map', type:'zone', id:z.id }, '*'); });
+    g.on('mouseover', () => g.setStyle({ fillOpacity: .42, weight: 2.4 }));
+    g.on('mouseout', () => g.setStyle({ fillOpacity: z.id === selected ? .44 : .26, weight: z.id === selected ? 2.6 : 1.6 }));
+    g.bindTooltip(
+      '<span class="zlab" style="color:' + P().labInk + ';background:' + P().labBg + ';border-color:' + col + '">' + z.id + ' · ' + z.name + '</span>',
+      { permanent: false, direction: 'top', offset: [0, -2], className: 'ztip', opacity: 1, sticky: true }
+    );
+    g.bindPopup('<div class="pop"><b>' + z.name + '</b>' + z.id + ' · near ' + z.near + '<br>' + z.haz + '<br>' + z.pop.toLocaleString('en-IN') + ' residents</div>');
+    layers[z.id] = g;
+  });
+  SHELTERS.forEach(s => {
+    const m = L.circleMarker(s.c, { radius: 6, color: P().shelter, weight: 2, fillColor: P().shelter, fillOpacity: .55 }).addTo(map);
+    m.bindPopup('<div class="pop"><b>' + s.name + '</b>' + s.id + ' · relief shelter</div>');
+    labels[s.id] = m;
+  });
+}
+
+function drawRoute() {
+  ROUTE.forEach(seg => {
+    L.polyline(seg.pts, {
+      color: P()[seg.status], weight: 6, opacity: .95,
+      dashArray: seg.status === 'suspect' ? '8 7' : null, lineCap: 'round'
+    }).addTo(map);
+  });
+  L.polyline(ALT, { color: P().shelter, weight: 3, opacity: .8, dashArray: '3 6' }).addTo(map)
+    .bindTooltip('RT-07B alternative · 6.1 km', { sticky: true });
+  const z = ZONES[0], s = SHELTERS[0];
+  L.polygon(poly(z.c, z.r * 0.7), { color: P().immediate, weight: 1.6, fillColor: P().immediate, fillOpacity: .24 }).addTo(map);
+  L.circleMarker(s.c, { radius: 7, color: P().shelter, weight: 2, fillColor: P().shelter, fillOpacity: .6 }).addTo(map)
+    .bindTooltip('<span class="zlab" style="color:' + P().labInk + ';background:' + P().labBg + ';border-color:' + P().shelter + '">SH-01</span>',
+      { permanent: true, direction: 'right', offset: [8, 0], opacity: 1 });
+  L.circleMarker(ROUTE[1].pts[1], { radius: 6, color: P().blocked, weight: 3, fillColor: '#000', fillOpacity: .25 }).addTo(map)
+    .bindTooltip('Segment 2 · blocked, confirmed', { direction: 'top' });
+  L.circleMarker(ROUTE[2].pts[1], { radius: 6, color: P().suspect, weight: 3, fillColor: '#000', fillOpacity: .2 }).addTo(map)
+    .bindTooltip('Segment 3 · SAR-suspected', { direction: 'bottom' });
+}
+
+function select(id) {
+  selected = id;
+  if (fallbackActive || !map) return;
+  Object.entries(layers).forEach(([k, g]) => {
+    const z = ZONES.find(x => x.id === k);
+    g.setStyle({ fillOpacity: k === id ? .44 : .22, weight: k === id ? 2.8 : 1.6, color: k === id ? P().shelter : P()[z.tier] });
+  });
+  Object.values(layers).forEach(g => g.closeTooltip());
+  const g = layers[id];
+  if (g) { g.openTooltip(g.getBounds().getCenter()); map.flyToBounds(g.getBounds().pad(1.6), { duration: .7, maxZoom: 13 }); }
+}
+
+function caption() {
+  const c = document.getElementById('cap');
+  c.style.color = P().capInk; c.style.background = P().capBg;
+  c.innerHTML = MODE === 'route'
+    ? 'Real OpenStreetMap geography · Haflong–Upper Ridge road network.<br>Route geometry and segment status are sample data.'
+    : 'Real OpenStreetMap geography · Dima Hasao district, Assam.<br>Zone footprints and populations are sample data.';
+}
+
+if (typeof L === 'undefined') {
+  renderFallback();
+} else {
+  map = L.map('map', { zoomControl: MODE === 'zones', attributionControl: true, scrollWheelZoom: MODE === 'zones' });
+  setTileLayer('osm');
+
+  if (MODE === 'route') {
+    drawRoute();
+    map.fitBounds(L.latLngBounds(ALT.concat(ROUTE.flatMap(s => s.pts))).pad(0.45));
+  } else {
+    drawZones();
+    map.fitBounds(L.latLngBounds(ZONES.map(z => z.c)).pad(0.2));
+  }
+  caption();
+}
+
+addEventListener('message', e => {
+  const d = e.data || {};
+  if (d.type === 'select' && !fallbackActive && layers[d.id]) select(d.id);
+  if (d.type === 'theme' && d.theme && d.theme !== theme) {
+    theme = d.theme;
+    document.body.dataset.theme = theme;
+    document.documentElement.style.background = theme === 'light' ? '#E7EBF1' : '#070d1c';
+    if (fallbackActive) {
+      renderFallback();
+    } else if (map) {
+      map.eachLayer(l => { if (!(l instanceof L.TileLayer)) map.removeLayer(l); });
+      Object.keys(layers).forEach(k => delete layers[k]);
+      if (tileKind === 'esri') setTileLayer('esri');
+      if (MODE === 'route') drawRoute(); else drawZones();
+      if (selected) select(selected);
+      caption();
+    }
+  }
+});
+parent.postMessage({ src:'dh-map', type:'ready', mode: MODE }, '*');
+</script>
+</body>
+</html>
