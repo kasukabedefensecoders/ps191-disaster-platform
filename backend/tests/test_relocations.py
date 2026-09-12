@@ -155,3 +155,41 @@ def test_unknown_relocation_returns_404(client):
     headers = _auth_headers(client, "sdma.official@ps191.dev")
     response = client.get(f"/relocations/{uuid.uuid4()}", headers=headers)
     assert response.status_code == 404
+
+
+def test_field_officer_cannot_read_relocation_outside_assigned_zones(client, admin_db):
+    """RLS on relocation_records (Backend Schema §7, migration 0003) joins
+    household_id -> households.zone_id -> user_zone_assignments, the same
+    way surveys does — relocation_records has no zone_id column of its own.
+    Writes were already gated to sdma_official (Phase 6); this closes the
+    read side: a field_officer must get nothing back for a record tied to
+    a household outside their assigned zones, not just be blocked from
+    creating one."""
+    sdma_headers = _auth_headers(client, "sdma.official@ps191.dev")
+    officer_headers = _auth_headers(client, "field.officer@ps191.dev")
+
+    # HH-203 is in ZN-02, not one of the seeded field_officer's assigned
+    # zones (ZN-01, ZN-03) — sdma_official bypasses RLS and can decide it.
+    household_id = _household_id(client, sdma_headers, "ZN-02", "HH-203")
+    shelter_id = _shelter_id(client, sdma_headers, "SH-02")
+    created = client.post(
+        "/relocations", headers=sdma_headers, json={"household_id": household_id, "shelter_id": shelter_id}
+    )
+    assert created.status_code == 201
+    record_id = created.json()["record_id"]
+
+    try:
+        # sdma_official (bypasses RLS) can still see it.
+        assert client.get(f"/relocations/{record_id}", headers=sdma_headers).status_code == 200
+
+        # field_officer gets nothing — same 404-hides-existence pattern as
+        # zones/households, not a 403 that would confirm the record exists.
+        hidden = client.get(f"/relocations/{record_id}", headers=officer_headers)
+        assert hidden.status_code == 404
+
+        officer_list = client.get("/relocations", headers=officer_headers).json()
+        assert record_id not in {r["record_id"] for r in officer_list["items"]}
+    finally:
+        admin_db.execute(text("delete from audit_log where entity_id = :id"), {"id": record_id})
+        admin_db.execute(text("delete from relocation_records where record_id = :id"), {"id": record_id})
+        admin_db.commit()
