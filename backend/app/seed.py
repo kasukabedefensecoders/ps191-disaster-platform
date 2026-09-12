@@ -14,6 +14,7 @@ from sqlalchemy import text
 from .auth.security import hash_password
 from .db import SessionLocal
 from .models import District, Escort, Household, Route, Shelter, User, UserZoneAssignment, Vehicle, Zone
+from .services.change_detection import ensure_sample_imagery_for_zone
 
 NOW = datetime.now(timezone.utc)
 
@@ -279,9 +280,14 @@ def seed() -> None:
             db.add(UserZoneAssignment(user_id=field_officer.user_id, zone_id=zones_by_code[zone_code].zone_id))
 
         db.commit()
+
+        # Phase 11's one curated before/after pair — MinIO, not the DB, so
+        # this runs after the transaction commits rather than inside it.
+        ensure_sample_imagery_for_zone("ZN-01")
+
         print(f"Seeded district {district.name}, {len(ZONES)} zones, {len(HOUSEHOLDS)} households, "
               f"{len(SHELTERS)} shelters, {len(VEHICLES)} vehicles, {len(ESCORTS)} escorts, 1 route, "
-              f"{len(SEED_USERS)} users (password: {SEED_PASSWORD}).")
+              f"{len(SEED_USERS)} users (password: {SEED_PASSWORD}), sample imagery for ZN-01.")
     finally:
         db.close()
 

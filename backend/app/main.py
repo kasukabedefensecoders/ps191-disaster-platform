@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
 from .auth.router import router as auth_router
+from .routers.change_detection import router as change_detection_router
 from .routers.dashboard import router as dashboard_router
 from .routers.escorts import router as escorts_router
 from .routers.forecasts import router as forecasts_router
@@ -47,6 +48,7 @@ app.include_router(routes_router)
 app.include_router(dashboard_router)
 app.include_router(surveys_router)
 app.include_router(forecasts_router)
+app.include_router(change_detection_router)
 
 
 @app.get("/health")
