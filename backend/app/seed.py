@@ -43,13 +43,42 @@ HOUSEHOLDS = [
 ]
 
 # code, name, max_capacity, current_occupancy, facilities
+# facilities' 4 canonical booleans (water/medical/toilets/power) are the same
+# 4 categories matchFactors()'s "Facility match" factor divides by; "other"
+# is for anything beyond those 4 (see docs/BACKEND-SCHEMA.md §6.3).
 SHELTERS = [
-    ("SH-01", "Ridge Higher Secondary School", 450, 180, {"water": True, "medical": True, "toilets": True, "other": ["power"]}),
+    ("SH-01", "Ridge Higher Secondary School", 450, 180, {"water": True, "medical": True, "toilets": True, "power": True}),
     ("SH-02", "Block Community Hall", 200, 95, {"water": True, "toilets": True}),
-    ("SH-03", "District Stadium Ground", 800, 120, {"water": True, "toilets": True, "other": ["power"]}),
+    ("SH-03", "District Stadium Ground", 800, 120, {"water": True, "toilets": True, "power": True}),
     ("SH-04", "Block Office Complex", 150, 148, {"water": True, "medical": True, "toilets": True}),
     ("SH-05", "Tea Estate Godown", 300, 0, {"water": True}),
 ]
+
+# zone_code -> incident_history rows (docs/BACKEND-SCHEMA.md §6.2 shape),
+# ported from the prototype's per-zone `incidents` arrays. prio_factors()'s
+# "Recorded incident history" factor reads len(incident_history), so this
+# has to be populated for the Phase 2 scoring port to reproduce the
+# prototype's own priority scores, not just its vulnerability scores.
+ZONE_INCIDENTS = {
+    "ZN-01": [
+        {"hazard_type": "landslide", "date": "2022-05-14", "severity": "high", "source": "GSI historical incident report", "description": "Cluster landslide · 3 casualties, 11 houses lost"},
+        {"hazard_type": "landslide", "date": "2019-07-02", "severity": "moderate", "source": "GSI historical incident report", "description": "Slope failure · road cut for 9 days"},
+        {"hazard_type": "landslide", "date": "2016-06-28", "severity": "moderate", "source": "GSI historical incident report", "description": "Debris flow · 2 houses damaged"},
+    ],
+    "ZN-02": [
+        {"hazard_type": "flood", "date": "2024-06-19", "severity": "high", "source": "GSI historical incident report", "description": "Flood · 240 households displaced"},
+        {"hazard_type": "flood", "date": "2022-05-16", "severity": "high", "source": "GSI historical incident report", "description": "Flood · embankment breach, 2 wards cut off"},
+        {"hazard_type": "flood", "date": "2020-07-11", "severity": "moderate", "source": "GSI historical incident report", "description": "Flood · livestock and crop loss"},
+    ],
+    "ZN-03": [
+        {"hazard_type": "landslide", "date": "2023-08-04", "severity": "moderate", "source": "GSI historical incident report", "description": "Slip above habitation · no casualties"},
+        {"hazard_type": "cloudburst", "date": "2021-09-22", "severity": "moderate", "source": "GSI historical incident report", "description": "Cloudburst · flash debris through 4 plots"},
+    ],
+    "ZN-04": [
+        {"hazard_type": "flood", "date": "2022-05-18", "severity": "moderate", "source": "GSI historical incident report", "description": "Flood · 60 households displaced"},
+        {"hazard_type": "flood", "date": "2019-07-06", "severity": "low", "source": "GSI historical incident report", "description": "Waterlogging · 4 days"},
+    ],
+}
 
 SEED_USERS = [
     ("Anjali Rao", "sdma.official@ps191.dev", "sdma_official"),
@@ -107,6 +136,7 @@ def seed() -> None:
                 geom=_polygon_around(lon, lat),
                 hazard_types=hazards,
                 population=population,
+                incident_history=ZONE_INCIDENTS.get(code, []),
                 data_confidence=confidence,
                 last_verified_at=(NOW - timedelta(days=days_ago)) if days_ago is not None else None,
                 susceptibility_score=susp,

@@ -588,9 +588,12 @@ Every scoring service (TRD §7) writes this exact array shape regardless of whic
   "water": true,
   "medical": true,
   "toilets": true,
+  "power": true,
   "other": ["generator", "kitchen"]
 }
 ```
+
+`water`/`medical`/`toilets`/`power` are the 4 canonical facility categories the prototype's `matchFactors()` "Facility match" factor counts and divides by (`s.fac.length / 4`, ported in Phase 2 as `facility_count(...) / 4`). This v1.0 shape was missing `power` as its own boolean — the prototype tracked it as a 4th first-class category, not an extra, so it belongs alongside `water`/`medical`/`toilets` rather than inside `other`. `other` stays for genuinely extra amenities beyond those 4 (generators, a kitchen) that don't factor into that ratio.
 
 ### 6.4 `routes.blocked_segments`
 
