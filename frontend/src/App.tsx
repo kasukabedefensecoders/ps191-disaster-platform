@@ -1,50 +1,58 @@
-import { useEffect, useState } from "react";
+import type { ReactElement } from "react";
+import { Navigate, Route, HashRouter as Router, Routes } from "react-router-dom";
 
-import ZoneMap from "./components/ZoneMap";
-import { fetchZones, login, type Zone } from "./lib/api";
+import Layout from "./components/Layout";
+import { AuthProvider, useAuth } from "./lib/AuthContext";
+import Dashboard from "./pages/Dashboard";
+import Login from "./pages/Login";
+import Relocations from "./pages/Relocations";
+import Shelters from "./pages/Shelters";
 
-/**
- * Dev-only integration harness for Phase 3 — proves the real Leaflet/API
- * wiring works end to end. Not the real dashboard: there's no login screen,
- * role switching, or layout shell yet (all Phase 8). The hardcoded seeded
- * credentials below get replaced by the real login flow when Phase 8 lands.
- */
-const DEV_EMAIL = "sdma.official@ps191.dev";
-const DEV_PASSWORD = "ps191-demo-pass";
+function RequireAuth({ children }: { children: ReactElement }) {
+  const { token, loading } = useAuth();
+  if (loading) return <p style={{ padding: 16, color: "var(--ink3)" }}>Loading…</p>;
+  if (!token) return <Navigate to="/login" replace />;
+  return children;
+}
+
+// Without this, a successful login leaves the user stranded on /login —
+// AuthContext updates `token`, but nothing was navigating away from the
+// login route itself. Caught by actually logging in through the browser,
+// not by the type-checker or the earlier build check.
+function RedirectIfAuthed({ children }: { children: ReactElement }) {
+  const { token, loading } = useAuth();
+  if (loading) return null;
+  if (token) return <Navigate to="/" replace />;
+  return children;
+}
 
 export default function App() {
-  const [zones, setZones] = useState<Zone[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const token = await login(DEV_EMAIL, DEV_PASSWORD);
-        const response = await fetchZones(token);
-        if (!cancelled) setZones(response.items);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   return (
-    <main style={{ fontFamily: "sans-serif", height: "100vh", display: "flex", flexDirection: "column" }}>
-      <h1 style={{ padding: "0.75rem 1rem", margin: 0, fontSize: "1rem" }}>
-        PS191 — Hazard Red-Zone &amp; Relocation Platform
-      </h1>
-      <p style={{ padding: "0 1rem", margin: "0 0 0.5rem", fontSize: "0.8rem", opacity: 0.7 }}>
-        Dev harness for the Phase 3 zone map — the real dashboard shell lands in Phase 8.
-      </p>
-      <div style={{ flex: 1, position: "relative" }}>
-        {error && <p style={{ padding: "1rem", color: "#B80C09" }}>Failed to load zones: {error}</p>}
-        {!error && zones && <ZoneMap zones={zones} />}
-        {!error && !zones && <p style={{ padding: "1rem" }}>Loading zones…</p>}
-      </div>
-    </main>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              <RedirectIfAuthed>
+                <Login />
+              </RedirectIfAuthed>
+            }
+          />
+          <Route
+            path="/"
+            element={
+              <RequireAuth>
+                <Layout />
+              </RequireAuth>
+            }
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="shelters" element={<Shelters />} />
+            <Route path="relocations" element={<Relocations />} />
+          </Route>
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }

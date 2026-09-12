@@ -1,0 +1,58 @@
+/* docs/DESIGN-SYSTEM.md §2 — dark theme only for now (the design doc's
+   light-theme override isn't wired here; this is the core dashboard shell,
+   not full 18-screen fidelity — see the Phase 8 note in BUILD-PLAN.md). */
+:root {
+  --bg: #070b16;
+  --bg2: #0a1020;
+  --panel: #0d1426;
+  --panel2: #0f1730;
+  --track: #111b31;
+  --row-sel: #101c38;
+  --border: #1d2a45;
+  --border2: #2a3b5e;
+  --border-soft: #141e35;
+
+  --ink: #e9eef8;
+  --ink2: #c6d2e8;
+  --ink3: #8d9cb8;
+  --ink4: #7c8db0;
+  --ink5: #5b6b8c;
+
+  /* risk-severity scale (§2.3) — immediate/short_term/medium_term tiers
+     and zone risk bands both read through this, never a raw hex */
+  --sev1: #b80c09;
+  --sev2: #db222a;
+  --sev3: #fd9e02;
+  --sev4: #8fc93a;
+  --sev5: #32e875;
+
+  --font-interface: "Schibsted Grotesk", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-interface);
+}
+
+input,
+button,
+select {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+}
