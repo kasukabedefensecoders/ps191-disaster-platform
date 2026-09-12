@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from .auth.security import hash_password
 from .db import SessionLocal
-from .models import District, Escort, Household, Shelter, User, UserZoneAssignment, Vehicle, Zone
+from .models import District, Escort, Household, Route, Shelter, User, UserZoneAssignment, Vehicle, Zone
 
 NOW = datetime.now(timezone.utc)
 
@@ -115,6 +115,35 @@ ESCORTS = [
     ("NDRF Sqd 4", "NDRF 1st Bn · Guwahati"),
 ]
 
+# Phase 7 (docs/BUILD-PLAN.md): real OSM road geometry (NH627 near Haflong,
+# fetched from the Overpass API on 2026-09-12, downsampled from 776 to ~50
+# points), not a synthetic straight line — verifies TRD §13's flagged risk
+# ("OSM coverage for a rural, hilly district may be too sparse for sensible
+# routes") is not actually a problem for this stretch: 12.8 km of continuous
+# trunk-road geometry runs directly past the ZN-01/SH-01/SH-03 area. This is
+# real road data with no live OSRM instance behind it yet (that step —
+# osrm-extract/partition/contract over a proper .osm.pbf — needs a properly
+# resourced environment this session didn't have; see the Phase 7 note in
+# the BUILD-PLAN for what was and wasn't verified).
+RT07_PATH_COORDS = [
+    (93.025157, 25.126496), (93.024677, 25.129017), (93.025002, 25.130252), (93.024518, 25.131424),
+    (93.023003, 25.130845), (93.021897, 25.131241), (93.020267, 25.131724), (93.018303, 25.132138),
+    (93.017653, 25.133133), (93.018895, 25.134255), (93.018569, 25.135624), (93.018824, 25.136788),
+    (93.019853, 25.137460), (93.019317, 25.138633), (93.020432, 25.140499), (93.021849, 25.140589),
+    (93.022077, 25.141930), (93.022876, 25.143760), (93.023898, 25.145172), (93.025805, 25.147239),
+    (93.025741, 25.148074), (93.025707, 25.149495), (93.025649, 25.150852), (93.025641, 25.152552),
+    (93.024543, 25.154253), (93.023029, 25.155389), (93.021442, 25.156033), (93.018960, 25.156632),
+    (93.017006, 25.157112), (93.015524, 25.157673), (93.014076, 25.160229), (93.015681, 25.159619),
+    (93.017652, 25.159699), (93.017757, 25.163828), (93.018342, 25.166953), (93.017665, 25.168562),
+    (93.015450, 25.169823), (93.015584, 25.171609), (93.014875, 25.173544), (93.015936, 25.186022),
+    (93.017582, 25.187784), (93.019641, 25.187544), (93.019552, 25.188288), (93.019137, 25.188958),
+    (93.020705, 25.188765), (93.021047, 25.190540), (93.021013, 25.193065), (93.021464, 25.194786),
+    (93.018421, 25.196728), (93.018101, 25.198565), (93.017938, 25.199816), (93.015590, 25.199611),
+    (93.014083, 25.200428),
+]
+RT07_DISTANCE_KM = 12.8  # real, computed from the full (non-downsampled) geometry
+RT07_DURATION_MINUTES = round(RT07_DISTANCE_KM / 25 * 60)  # same 25 km/h planning assumption as Phase 5/6
+
 
 def _point(lon: float, lat: float) -> str:
     return f"SRID=4326;POINT({lon} {lat})"
@@ -125,6 +154,11 @@ def _polygon_around(lon: float, lat: float, delta: float = 0.01) -> str:
         f"SRID=4326;POLYGON(({lon - delta} {lat - delta}, {lon + delta} {lat - delta}, "
         f"{lon + delta} {lat + delta}, {lon - delta} {lat + delta}, {lon - delta} {lat - delta}))"
     )
+
+
+def _linestring(coords: list[tuple[float, float]]) -> str:
+    pts = ", ".join(f"{lon} {lat}" for lon, lat in coords)
+    return f"SRID=4326;LINESTRING({pts})"
 
 
 # Approximate centroids inside Dima Hasao district, spaced out for the demo map.
@@ -212,6 +246,20 @@ def seed() -> None:
         for full_name, agency in ESCORTS:
             db.add(Escort(escort_id=uuid.uuid4(), full_name=full_name, agency=agency))
 
+        origin_lon, origin_lat = RT07_PATH_COORDS[0]
+        dest_lon, dest_lat = RT07_PATH_COORDS[-1]
+        db.add(
+            Route(
+                route_id=uuid.uuid4(),
+                display_code="RT-07",
+                origin_geom=_point(origin_lon, origin_lat),
+                dest_geom=_point(dest_lon, dest_lat),
+                path=_linestring(RT07_PATH_COORDS),
+                distance_km=RT07_DISTANCE_KM,
+                estimated_duration_minutes=RT07_DURATION_MINUTES,
+            )
+        )
+
         users_by_role: dict[str, User] = {}
         for full_name, email, role in SEED_USERS:
             user = User(
@@ -232,7 +280,7 @@ def seed() -> None:
 
         db.commit()
         print(f"Seeded district {district.name}, {len(ZONES)} zones, {len(HOUSEHOLDS)} households, "
-              f"{len(SHELTERS)} shelters, {len(VEHICLES)} vehicles, {len(ESCORTS)} escorts, "
+              f"{len(SHELTERS)} shelters, {len(VEHICLES)} vehicles, {len(ESCORTS)} escorts, 1 route, "
               f"{len(SEED_USERS)} users (password: {SEED_PASSWORD}).")
     finally:
         db.close()

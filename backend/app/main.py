@@ -6,6 +6,7 @@ from .auth.router import router as auth_router
 from .routers.escorts import router as escorts_router
 from .routers.households import router as households_router
 from .routers.relocations import router as relocations_router
+from .routers.routes import router as routes_router
 from .routers.shelters import router as shelters_router
 from .routers.vehicles import router as vehicles_router
 from .routers.zones import router as zones_router
@@ -34,6 +35,7 @@ app.include_router(households_router)
 app.include_router(vehicles_router)
 app.include_router(escorts_router)
 app.include_router(relocations_router)
+app.include_router(routes_router)
 
 
 @app.get("/health")
