@@ -59,9 +59,15 @@ SHELTERS = [
 # "Recorded incident history" factor reads len(incident_history), so this
 # has to be populated for the Phase 2 scoring port to reproduce the
 # prototype's own priority scores, not just its vulnerability scores.
+#
+# ZN-01's first entry is a real, sourced event (district-wide, not
+# zone-specific — see docs/BUILD-PLAN.md's "Phase 3 data-sourcing findings"
+# for the citation and the honest limits of what could be verified);
+# every other entry below is still representative sample data like the
+# rest of this file (rule 6 — never presented as live government data).
 ZONE_INCIDENTS = {
     "ZN-01": [
-        {"hazard_type": "landslide", "date": "2022-05-14", "severity": "high", "source": "GSI historical incident report", "description": "Cluster landslide · 3 casualties, 11 houses lost"},
+        {"hazard_type": "landslide", "date": "2022-05-11", "severity": "high", "source": "Kumar et al., Landslides (2022) 10.1007/s10346-022-01977-6; AGU Landslide Blog", "description": "Real, verified district-wide event: 5,178 landslides triggered by 156mm rainfall in 24h (540mm for the month); ~57,000 people displaced district-wide, 3 deaths, New Haflong railway station buried by an ~8m-deep debris flow. Haflong block (this zone's real-world area) was within the affected area; attribution to this specific synthetic zone/household count is illustrative, not GSI-sourced."},
         {"hazard_type": "landslide", "date": "2019-07-02", "severity": "moderate", "source": "GSI historical incident report", "description": "Slope failure · road cut for 9 days"},
         {"hazard_type": "landslide", "date": "2016-06-28", "severity": "moderate", "source": "GSI historical incident report", "description": "Debris flow · 2 houses damaged"},
     ],

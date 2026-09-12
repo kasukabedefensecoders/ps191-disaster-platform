@@ -1,10 +1,29 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 from .auth.router import router as auth_router
+from .routers.zones import router as zones_router
 
 app = FastAPI(title="PS191 — Hazard Red-Zone & Relocation Platform")
 
+# Rule 8 (low-bandwidth by default): assume a satellite-backed link, gzip
+# every response, not just the dashboard summary endpoint.
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
+# Dev-only: lets the Vite dev server (localhost:5173) call this API
+# (localhost:8000) from the browser. Revisit before any real deployment —
+# this is not meant to describe a production origin policy.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(auth_router)
+app.include_router(zones_router)
 
 
 @app.get("/health")
