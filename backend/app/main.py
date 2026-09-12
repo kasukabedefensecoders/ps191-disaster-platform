@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
 from .auth.router import router as auth_router
+from .routers.households import router as households_router
+from .routers.shelters import router as shelters_router
 from .routers.zones import router as zones_router
 
 app = FastAPI(title="PS191 — Hazard Red-Zone & Relocation Platform")
@@ -24,6 +26,8 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(zones_router)
+app.include_router(shelters_router)
+app.include_router(households_router)
 
 
 @app.get("/health")

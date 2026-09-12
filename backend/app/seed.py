@@ -42,16 +42,20 @@ HOUSEHOLDS = [
     ("HH-408", "ZN-04", 5, 2, 2, 1, "Semi-pucca", "field_verified", 96),
 ]
 
-# code, name, max_capacity, current_occupancy, facilities
+# code, name, max_capacity, current_occupancy, facilities, (lon, lat)
 # facilities' 4 canonical booleans (water/medical/toilets/power) are the same
 # 4 categories matchFactors()'s "Facility match" factor divides by; "other"
 # is for anything beyond those 4 (see docs/BACKEND-SCHEMA.md §6.3).
+# Coordinates are the same ones PROTOTYPE/dima-hasao-map.html already uses
+# for these 5 shelters (real, distinct points, not the zone-centroid
+# placeholder every shelter shared before Phase 5) — needed for real
+# distance to mean anything once shelter_matching.py computes it.
 SHELTERS = [
-    ("SH-01", "Ridge Higher Secondary School", 450, 180, {"water": True, "medical": True, "toilets": True, "power": True}),
-    ("SH-02", "Block Community Hall", 200, 95, {"water": True, "toilets": True}),
-    ("SH-03", "District Stadium Ground", 800, 120, {"water": True, "toilets": True, "power": True}),
-    ("SH-04", "Block Office Complex", 150, 148, {"water": True, "medical": True, "toilets": True}),
-    ("SH-05", "Tea Estate Godown", 300, 0, {"water": True}),
+    ("SH-01", "Ridge Higher Secondary School", 450, 180, {"water": True, "medical": True, "toilets": True, "power": True}, (93.0205, 25.1700)),
+    ("SH-02", "Block Community Hall", 200, 95, {"water": True, "toilets": True}, (93.1255, 25.3035)),
+    ("SH-03", "District Stadium Ground", 800, 120, {"water": True, "toilets": True, "power": True}, (93.0115, 25.1620)),
+    ("SH-04", "Block Office Complex", 150, 148, {"water": True, "medical": True, "toilets": True}, (92.7020, 25.4650)),
+    ("SH-05", "Tea Estate Godown", 300, 0, {"water": True}, (92.9580, 25.0320)),
 ]
 
 # zone_code -> incident_history rows (docs/BACKEND-SCHEMA.md §6.2 shape),
@@ -173,13 +177,13 @@ def seed() -> None:
             )
             db.add(household)
 
-        for code, name, max_capacity, current_occupancy, facilities in SHELTERS:
+        for code, name, max_capacity, current_occupancy, facilities, (lon, lat) in SHELTERS:
             shelter = Shelter(
                 shelter_id=uuid.uuid4(),
                 display_code=code,
                 district_id=district.district_id,
                 name=name,
-                geom=_point(93.35, 25.16),
+                geom=_point(lon, lat),
                 max_capacity=max_capacity,
                 current_occupancy=current_occupancy,
                 facilities=facilities,
