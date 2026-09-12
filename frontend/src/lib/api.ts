@@ -120,6 +120,23 @@ export interface RelocationRecord {
   updated_at: string;
 }
 
+export type HandoffStatus = "open" | "acknowledged" | "in_progress" | "resolved";
+
+export interface HandoffLog {
+  log_id: string;
+  display_code: string | null;
+  need_type: string;
+  agency: string;
+  status: HandoffStatus;
+  linked_record_id: string | null;
+  zone_id: string | null;
+  household_id: string | null;
+  description: string | null;
+  raised_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+}
+
 export interface Paged<T> {
   items: T[];
   count: number;
@@ -135,6 +152,7 @@ export interface DashboardSummary {
   shelters: Paged<Shelter>;
   routes: Paged<RouteRecord>;
   relocations: Paged<RelocationRecord>;
+  handoffs: Paged<HandoffLog>;
   top_priority_households: HouseholdRanked[];
 }
 
@@ -208,3 +226,11 @@ export const updateRelocationStatus = (token: string, recordId: string, status: 
   });
 
 export const fetchDashboardSummary = (token: string) => request<DashboardSummary>("/dashboard/summary", token);
+
+export const fetchHandoffs = (token: string) => request<Paged<HandoffLog>>("/handoffs?limit=200", token);
+export const updateHandoffStatus = (token: string, logId: string, status: HandoffStatus) =>
+  request<HandoffLog>(`/handoffs/${logId}/status`, token, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });

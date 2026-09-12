@@ -1,5 +1,34 @@
 import { riskColor } from "../lib/riskColor";
-import type { DataConfidence, PriorityTier } from "../lib/api";
+import type { DataConfidence, HandoffStatus, PriorityTier } from "../lib/api";
+
+const HANDOFF_COLOR: Record<HandoffStatus, string> = {
+  open: "var(--sev1)",
+  acknowledged: "var(--sev3)",
+  in_progress: "var(--sev3)",
+  resolved: "var(--sev5)",
+};
+
+// Phase 12: "status flag surfaced on the dashboard" — this is that flag.
+export function HandoffStatusBadge({ status }: { status: HandoffStatus }) {
+  return (
+    <span
+      style={{
+        fontFamily: "var(--font-data)",
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: "0.03em",
+        padding: "2px 7px",
+        borderRadius: 3,
+        color: HANDOFF_COLOR[status],
+        border: `1px solid ${HANDOFF_COLOR[status]}`,
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {status.replace("_", " ")}
+    </span>
+  );
+}
 
 const TIER_LABEL: Record<PriorityTier, string> = {
   immediate: "Immediate",

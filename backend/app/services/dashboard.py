@@ -3,10 +3,12 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from ..schemas.dashboard import DashboardSummary
+from ..schemas.handoff import HandoffLogListResponse
 from ..schemas.relocation import RelocationRecordListResponse
 from ..schemas.route import RouteListResponse
 from ..schemas.shelter import ShelterListResponse
 from ..schemas.zone import ZoneListResponse
+from . import handoffs as handoffs_service
 from . import households as households_service
 from . import relocations as relocations_service
 from . import routes as routes_service
@@ -22,6 +24,7 @@ def build_dashboard_summary(db: Session, since: datetime | None) -> DashboardSum
     shelter_items, shelter_total = shelters_service.list_shelters(db, since=since, limit=PAGE_LIMIT, offset=0)
     route_items, route_total = routes_service.list_routes(db, limit=PAGE_LIMIT, offset=0)
     relocation_items, relocation_total = relocations_service.list_relocations(db, limit=PAGE_LIMIT, offset=0)
+    handoff_items, handoff_total = handoffs_service.list_handoffs(db, since=since, limit=PAGE_LIMIT, offset=0)
 
     # Top priority households: computed fresh across every zone this caller
     # can see (RLS-scoped, same as GET /zones), not filtered by `since` —
@@ -44,5 +47,6 @@ def build_dashboard_summary(db: Session, since: datetime | None) -> DashboardSum
         relocations=RelocationRecordListResponse(
             items=relocation_items, count=relocation_total, limit=PAGE_LIMIT, offset=0, next_offset=None
         ),
+        handoffs=HandoffLogListResponse(items=handoff_items, count=handoff_total, limit=PAGE_LIMIT, offset=0, next_offset=None),
         top_priority_households=ranked_households[:TOP_HOUSEHOLDS_LIMIT],
     )

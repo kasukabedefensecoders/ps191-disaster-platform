@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import FactorsPanel from "../components/FactorsPanel";
 import ZoneMap from "../components/ZoneMap";
-import { ConfidenceBadge, SampleDataBadge, TierBadge } from "../components/badges";
+import { ConfidenceBadge, HandoffStatusBadge, SampleDataBadge, TierBadge } from "../components/badges";
 import { fetchDashboardSummary, type DashboardSummary, type HouseholdRanked } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 
@@ -35,20 +35,52 @@ export default function Dashboard() {
       <div style={{ flex: 2, position: "relative", borderRight: "1px solid var(--border)" }}>
         <ZoneMap zones={summary.zones.items} />
       </div>
-      <div style={{ flex: 1, minWidth: 340, maxWidth: 420, overflow: "auto", padding: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <h2 style={{ fontSize: 14, margin: 0 }}>Priority queue</h2>
-          <SampleDataBadge />
+      <div style={{ flex: 1, minWidth: 340, maxWidth: 420, overflow: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h2 style={{ fontSize: 14, margin: 0 }}>Priority queue</h2>
+            <SampleDataBadge />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {summary.top_priority_households.map((h) => (
+              <HouseholdCard
+                key={h.household_id}
+                household={h}
+                expanded={expanded === h.household_id}
+                onToggle={() => setExpanded(expanded === h.household_id ? null : h.household_id)}
+              />
+            ))}
+          </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {summary.top_priority_households.map((h) => (
-            <HouseholdCard
-              key={h.household_id}
-              household={h}
-              expanded={expanded === h.household_id}
-              onToggle={() => setExpanded(expanded === h.household_id ? null : h.household_id)}
-            />
-          ))}
+
+        <div>
+          <h2 style={{ fontSize: 14, margin: "0 0 12px" }}>Interagency handoffs</h2>
+          {summary.handoffs.items.length === 0 && <p style={{ fontSize: 12, color: "var(--ink3)" }}>No open needs.</p>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {summary.handoffs.items.map((h) => (
+              <div
+                key={h.log_id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: "var(--panel)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 6,
+                  padding: "8px 10px",
+                  fontSize: 12,
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                  <span style={{ fontFamily: "var(--font-data)", fontWeight: 600 }}>
+                    {h.display_code} · {h.need_type}
+                  </span>
+                  <span style={{ color: "var(--ink3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.agency}</span>
+                </div>
+                <HandoffStatusBadge status={h.status} />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

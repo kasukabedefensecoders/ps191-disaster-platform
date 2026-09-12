@@ -2,6 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from .handoff import HandoffLogListResponse
 from .household import HouseholdRankedOut
 from .relocation import RelocationRecordListResponse
 from .route import RouteListResponse
@@ -24,4 +25,5 @@ class DashboardSummary(BaseModel):
     shelters: ShelterListResponse
     routes: RouteListResponse
     relocations: RelocationRecordListResponse
+    handoffs: HandoffLogListResponse  # Phase 12: "status flag surfaced on the dashboard"
     top_priority_households: list[HouseholdRankedOut]
