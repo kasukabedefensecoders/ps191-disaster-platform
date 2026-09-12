@@ -9,6 +9,7 @@ from .routers.households import router as households_router
 from .routers.relocations import router as relocations_router
 from .routers.routes import router as routes_router
 from .routers.shelters import router as shelters_router
+from .routers.surveys import router as surveys_router
 from .routers.vehicles import router as vehicles_router
 from .routers.zones import router as zones_router
 
@@ -23,7 +24,12 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 # this is not meant to describe a production origin policy.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",  # frontend-field (Phase 9) dev server
+        "http://127.0.0.1:5174",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,6 +44,7 @@ app.include_router(escorts_router)
 app.include_router(relocations_router)
 app.include_router(routes_router)
 app.include_router(dashboard_router)
+app.include_router(surveys_router)
 
 
 @app.get("/health")
