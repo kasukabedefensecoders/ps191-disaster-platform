@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from .auth.security import hash_password
 from .db import SessionLocal
-from .models import District, Household, Shelter, User, UserZoneAssignment, Zone
+from .models import District, Escort, Household, Shelter, User, UserZoneAssignment, Vehicle, Zone
 
 NOW = datetime.now(timezone.utc)
 
@@ -99,6 +99,21 @@ SEED_PASSWORD = "ps191-demo-pass"
 
 # field officer's assigned zones for the RLS test to have something to check
 FIELD_OFFICER_ZONES = ["ZN-01", "ZN-03"]
+
+# vehicle_type, capacity — ported from the prototype's move MV-118 example
+# ("Truck AS-04 · cap 24"); vehicles/escorts aren't in CLAUDE.md's
+# display-code list (only relocation records — "MV-xxx" — are), so these
+# are referenced by UUID only, same as the schema defines them.
+VEHICLES = [
+    ("Truck", 24),
+    ("Truck", 18),
+]
+
+# full_name, agency — ported from the prototype's "NDRF Sqd 2 · 3 pax"
+ESCORTS = [
+    ("NDRF Sqd 2", "NDRF 1st Bn · Guwahati"),
+    ("NDRF Sqd 4", "NDRF 1st Bn · Guwahati"),
+]
 
 
 def _point(lon: float, lat: float) -> str:
@@ -191,6 +206,12 @@ def seed() -> None:
             db.add(shelter)
         db.flush()
 
+        for vehicle_type, capacity in VEHICLES:
+            db.add(Vehicle(vehicle_id=uuid.uuid4(), district_id=district.district_id, vehicle_type=vehicle_type, capacity=capacity))
+
+        for full_name, agency in ESCORTS:
+            db.add(Escort(escort_id=uuid.uuid4(), full_name=full_name, agency=agency))
+
         users_by_role: dict[str, User] = {}
         for full_name, email, role in SEED_USERS:
             user = User(
@@ -211,7 +232,8 @@ def seed() -> None:
 
         db.commit()
         print(f"Seeded district {district.name}, {len(ZONES)} zones, {len(HOUSEHOLDS)} households, "
-              f"{len(SHELTERS)} shelters, {len(SEED_USERS)} users (password: {SEED_PASSWORD}).")
+              f"{len(SHELTERS)} shelters, {len(VEHICLES)} vehicles, {len(ESCORTS)} escorts, "
+              f"{len(SEED_USERS)} users (password: {SEED_PASSWORD}).")
     finally:
         db.close()
 

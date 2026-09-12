@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..models import Household, Zone
 from ..scoring import prio_factors, prio_score, prio_tier, vuln_factors, vuln_score
 from ..schemas.household import HouseholdRankedOut
+from .scoring_adapters import household_scoring_dict, zone_scoring_dict
 
 # households.priority_tier/vulnerability_score exist as columns (Backend
 # Schema §5.4) but Phase 2 wasn't wired to write them anywhere, and nothing
@@ -17,27 +18,8 @@ from ..schemas.household import HouseholdRankedOut
 # does not write the result back either.
 
 
-def _zone_scoring_dict(zone: Zone) -> dict:
-    return {
-        "risk_score_72h": float(zone.risk_score_72h) if zone.risk_score_72h is not None else 0.0,
-        "susceptibility_score": float(zone.susceptibility_score) if zone.susceptibility_score is not None else 0.0,
-        "incident_history": zone.incident_history or [],
-    }
-
-
-def _household_scoring_dict(household: Household) -> dict:
-    return {
-        "population_count": household.population_count,
-        "children_count": household.children_count,
-        "elderly_count": household.elderly_count,
-        "assistance_needs_count": household.assistance_needs_count,
-        "structural_condition": household.structural_condition,
-        "data_confidence": household.data_confidence,
-    }
-
-
 def _to_ranked_out(household: Household, geom_geojson: str, zone_scoring: dict) -> HouseholdRankedOut:
-    household_scoring = _household_scoring_dict(household)
+    household_scoring = household_scoring_dict(household)
     v_factors = vuln_factors(household_scoring)
     v_score = vuln_score(household_scoring)
     p_factors = prio_factors(household_scoring, zone_scoring)
@@ -73,7 +55,7 @@ def list_zone_households(
     zone = db.get(Zone, zone_id)
     if zone is None:
         return None
-    zone_scoring = _zone_scoring_dict(zone)
+    zone_scoring = zone_scoring_dict(zone)
 
     total = db.scalar(select(func.count()).select_from(Household).where(Household.zone_id == zone_id)) or 0
 
