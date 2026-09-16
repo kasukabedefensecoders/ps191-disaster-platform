@@ -11,6 +11,8 @@ class ChangeDetectionOut(BaseModel):
     after_image_ref: str
     affected_area_geom: dict | None
     confidence: float | None
+    cross_referenced_household_ids: list[uuid.UUID]
+    cross_referenced_survey_ids: list[uuid.UUID]
     detected_at: datetime
     created_at: datetime
 

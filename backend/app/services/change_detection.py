@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..cv.change_detection import generate_sample_pair, run_change_detection
-from ..models import ChangeDetection, Zone
+from ..models import ChangeDetection, Household, Survey, Zone
 from ..schemas.change_detection import ChangeDetectionOut
 from ..storage import download_bytes, object_exists, upload_bytes
 
@@ -39,9 +39,32 @@ def _to_out(detection: ChangeDetection, geom_geojson: str | None) -> ChangeDetec
         after_image_ref=detection.after_image_ref,
         affected_area_geom=json.loads(geom_geojson) if geom_geojson else None,
         confidence=float(detection.confidence) if detection.confidence is not None else None,
+        cross_referenced_household_ids=list(detection.cross_referenced_household_ids or []),
+        cross_referenced_survey_ids=list(detection.cross_referenced_survey_ids or []),
         detected_at=detection.detected_at,
         created_at=detection.created_at,
     )
+
+
+def _cross_reference(db: Session, zone_id: uuid.UUID, affected_geom) -> tuple[list[uuid.UUID], list[uuid.UUID]]:
+    """PRD §7.11 / TRD §8.3: the affected-area polygon is cross-referenced
+    against households/surveys so the platform reports not just *where*
+    impact is but *who* is affected. Scoped to the zone being detected on —
+    the same zone RLS already narrows every other read to."""
+    household_ids = db.scalars(
+        select(Household.household_id).where(
+            Household.zone_id == zone_id,
+            func.ST_Intersects(Household.geom, affected_geom),
+        )
+    ).all()
+    survey_ids = db.scalars(
+        select(Survey.survey_id).where(
+            Survey.zone_id == zone_id,
+            Survey.geotag.is_not(None),
+            func.ST_Intersects(Survey.geotag, affected_geom),
+        )
+    ).all()
+    return list(household_ids), list(survey_ids)
 
 
 def run_detection_for_zone(db: Session, zone_id: uuid.UUID) -> ChangeDetectionOut | None:
@@ -70,6 +93,18 @@ def run_detection_for_zone(db: Session, zone_id: uuid.UUID) -> ChangeDetectionOu
         detected_at=datetime.now(timezone.utc),
     )
     db.add(detection)
+    db.flush()
+
+    if geojson:
+        affected_geom_expr = (
+            select(ChangeDetection.affected_area_geom)
+            .where(ChangeDetection.detection_id == detection.detection_id)
+            .scalar_subquery()
+        )
+        household_ids, survey_ids = _cross_reference(db, zone.zone_id, affected_geom_expr)
+        detection.cross_referenced_household_ids = household_ids
+        detection.cross_referenced_survey_ids = survey_ids
+
     db.commit()
 
     row = db.execute(

@@ -60,6 +60,65 @@ def test_run_detection_without_curated_imagery_returns_400(client):
     assert response.status_code == 400
 
 
+def test_run_detection_cross_references_households_and_surveys_in_the_scar(client, admin_db):
+    """PRD §7.11 / TRD §8.3: the affected-area polygon must be cross-
+    referenced against households/surveys ("who is affected", not just
+    "where"). Places one household and one survey point inside the
+    synthetic scar's known lon/lat footprint (see
+    app/cv/change_detection.py's ORIGIN/PIXEL_SIZE_DEG and the
+    after[70:130, 55:125] patch) and confirms both come back on the
+    detection row; a household sitting well outside the scar is confirmed
+    absent."""
+    headers = _auth_headers(client, "sdma.official@ps191.dev")
+    zone_id = _zone_id(client, headers, "ZN-01")
+
+    inside_household_id = "11111111-1111-1111-1111-111111111111"
+    inside_survey_id = "22222222-2222-2222-2222-222222222222"
+    outside_household_id = "33333333-3333-3333-3333-333333333333"
+    admin_db.execute(
+        text(
+            "insert into households (household_id, display_code, zone_id, geom, population_count, "
+            "structural_condition, data_confidence) values "
+            "(:id, 'HH-TEST-IN', :zone_id, ST_SetSRID(ST_MakePoint(93.014, 25.165), 4326), 3, 'Kutcha', 'baseline')"
+        ),
+        {"id": inside_household_id, "zone_id": str(zone_id)},
+    )
+    admin_db.execute(
+        text(
+            "insert into households (household_id, display_code, zone_id, geom, population_count, "
+            "structural_condition, data_confidence) values "
+            "(:id, 'HH-TEST-OUT', :zone_id, ST_SetSRID(ST_MakePoint(93.02, 25.16), 4326), 3, 'Kutcha', 'baseline')"
+        ),
+        {"id": outside_household_id, "zone_id": str(zone_id)},
+    )
+    admin_db.execute(
+        text(
+            "insert into surveys (survey_id, zone_id, household_id, officer_id, submitted_at, payload, geotag, review_status) "
+            "values (:id, :zone_id, :household_id, "
+            "(select user_id from users where email = 'field.officer@ps191.dev'), "
+            "now(), '{}'::jsonb, ST_SetSRID(ST_MakePoint(93.0145, 25.1645), 4326), 'unreviewed')"
+        ),
+        {"id": inside_survey_id, "zone_id": str(zone_id), "household_id": inside_household_id},
+    )
+    admin_db.commit()
+
+    response = client.post(f"/zones/{zone_id}/change-detections/run", headers=headers)
+    try:
+        assert response.status_code == 200
+        body = response.json()
+        assert inside_household_id in body["cross_referenced_household_ids"]
+        assert outside_household_id not in body["cross_referenced_household_ids"]
+        assert inside_survey_id in body["cross_referenced_survey_ids"]
+    finally:
+        admin_db.execute(text("delete from change_detections where detection_id = :id"), {"id": response.json()["detection_id"]})
+        admin_db.execute(text("delete from surveys where survey_id = :id"), {"id": inside_survey_id})
+        admin_db.execute(
+            text("delete from households where household_id in (:in_id, :out_id)"),
+            {"in_id": inside_household_id, "out_id": outside_household_id},
+        )
+        admin_db.commit()
+
+
 def test_field_officer_cannot_run_or_list_for_unassigned_zone(client):
     officer_headers = _auth_headers(client, "field.officer@ps191.dev")
     sdma_headers = _auth_headers(client, "sdma.official@ps191.dev")
