@@ -9,6 +9,7 @@ from .routers.escorts import router as escorts_router
 from .routers.forecasts import router as forecasts_router
 from .routers.handoffs import router as handoffs_router
 from .routers.households import router as households_router
+from .routers.incident_outcomes import router as incident_outcomes_router
 from .routers.relocations import router as relocations_router
 from .routers.routes import router as routes_router
 from .routers.shelters import router as shelters_router
@@ -51,6 +52,7 @@ app.include_router(surveys_router)
 app.include_router(forecasts_router)
 app.include_router(change_detection_router)
 app.include_router(handoffs_router)
+app.include_router(incident_outcomes_router)
 
 
 @app.get("/health")

@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/shelters", label: "Shelters" },
   { to: "/relocations", label: "Relocations" },
+  { to: "/incident-outcomes", label: "Post-incident feedback" },
 ];
 
 export default function Layout() {

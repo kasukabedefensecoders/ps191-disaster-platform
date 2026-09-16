@@ -137,6 +137,24 @@ export interface HandoffLog {
   resolved_at: string | null;
 }
 
+export interface IncidentOutcome {
+  outcome_id: string;
+  zone_id: string;
+  relocation_record_id: string | null;
+  forecast_id: string | null;
+  detection_id: string | null;
+  occurred_at: string;
+  shelter_adequate: boolean | null;
+  route_held_up: boolean | null;
+  actual_impact: Record<string, unknown> | null;
+  notes: string | null;
+  recorded_by: string;
+  recorded_at: string;
+  created_at: string;
+  predicted_score: number | null;
+  predicted_horizon_hours: number | null;
+}
+
 export interface Paged<T> {
   items: T[];
   count: number;
@@ -233,4 +251,22 @@ export const updateHandoffStatus = (token: string, logId: string, status: Handof
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
+  });
+
+export const fetchIncidentOutcomes = (token: string, zoneId: string) =>
+  request<{ items: IncidentOutcome[]; count: number }>(`/zones/${zoneId}/incident-outcomes?limit=100`, token);
+export const createIncidentOutcome = (
+  token: string,
+  zoneId: string,
+  payload: {
+    occurred_at: string;
+    shelter_adequate?: boolean | null;
+    route_held_up?: boolean | null;
+    notes?: string | null;
+  },
+) =>
+  request<IncidentOutcome>(`/zones/${zoneId}/incident-outcomes`, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });

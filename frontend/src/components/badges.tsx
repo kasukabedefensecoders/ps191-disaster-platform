@@ -87,6 +87,20 @@ export function ConfidenceBadge({ confidence }: { confidence: DataConfidence }) 
   );
 }
 
+// PRD §7.12's two ground-truth questions ("was the shelter adequate",
+// "did the route hold up") are tri-state — an authority may not yet know
+// (null) — so this renders three states, not a boolean toggle.
+export function OutcomeBadge({ label, value }: { label: string; value: boolean | null }) {
+  const color = value === null ? "var(--ink3)" : value ? "var(--sev5)" : "var(--sev1)";
+  const text = value === null ? "Unknown" : value ? "Yes" : "No";
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11 }}>
+      <span style={{ color: "var(--ink3)" }}>{label}</span>
+      <span style={{ fontFamily: "var(--font-data)", fontWeight: 600, color }}>{text}</span>
+    </span>
+  );
+}
+
 export function RiskChip({ score }: { score: number | null }) {
   const color = riskColor(score);
   return (

@@ -4,6 +4,7 @@ import { Navigate, Route, HashRouter as Router, Routes } from "react-router-dom"
 import Layout from "./components/Layout";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import Dashboard from "./pages/Dashboard";
+import IncidentOutcomes from "./pages/IncidentOutcomes";
 import Login from "./pages/Login";
 import Relocations from "./pages/Relocations";
 import Shelters from "./pages/Shelters";
@@ -50,6 +51,7 @@ export default function App() {
             <Route index element={<Dashboard />} />
             <Route path="shelters" element={<Shelters />} />
             <Route path="relocations" element={<Relocations />} />
+            <Route path="incident-outcomes" element={<IncidentOutcomes />} />
           </Route>
         </Routes>
       </Router>
