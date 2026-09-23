@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
+from .config import settings
+
 from .auth.router import router as auth_router
 from .routers.change_detection import router as change_detection_router
 from .routers.dashboard import router as dashboard_router
@@ -24,17 +26,21 @@ app = FastAPI(title="PS191 — Hazard Red-Zone & Relocation Platform")
 # every response, not just the dashboard summary endpoint.
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
-# Dev-only: lets the Vite dev server (localhost:5173) call this API
-# (localhost:8000) from the browser. Revisit before any real deployment —
-# this is not meant to describe a production origin policy.
+# Dev origins (Vite dev servers) always allowed; production origins (the
+# deployed dashboard/field app) come from CORS_ALLOWED_ORIGINS, a
+# comma-separated list, so a new frontend deployment doesn't need a backend
+# code change — just a Railway env var.
+_dev_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",  # frontend-field (Phase 9) dev server
+    "http://127.0.0.1:5174",
+]
+_prod_origins = [origin.strip() for origin in settings.cors_allowed_origins.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",  # frontend-field (Phase 9) dev server
-        "http://127.0.0.1:5174",
-    ],
+    allow_origins=_dev_origins + _prod_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
