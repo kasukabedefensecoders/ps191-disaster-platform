@@ -13,7 +13,7 @@
 | Theme | Disaster Management |
 | Institution | Pillai University (PCACS), Panvel |
 | Companion documents | PRD v1.1 (what/why); TRD v1.0 (how, system-level) — this document formalizes the entity shapes fixed in TRD §5 into column-level DDL |
-| Document Owner | Mahasiddhi, Team Lead |
+| Document Owner | Kasukabe Defense Coders |
 | Version | 1.0 |
 | Date | September 2026 |
 

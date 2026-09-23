@@ -12,7 +12,7 @@
 | Category | Software |
 | Theme | Disaster Management |
 | Institution | Pillai University (PCACS), Panvel |
-| Document Owner | Mahasiddhi, Team Lead |
+| Document Owner | Kasukabe Defense Coders |
 | Version | 1.0 (Team approved) |
 | Date | September 2026 |
 

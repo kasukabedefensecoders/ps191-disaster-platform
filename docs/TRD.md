@@ -13,7 +13,7 @@
 | Theme | Disaster Management |
 | Institution | Pillai University (PCACS), Panvel |
 | Companion document | Product Requirements Document (PRD), v1.1 — defines what and why; this document defines how |
-| Document Owner | Mahasiddhi, Team Lead |
+| Document Owner | Kasukabe Defense Coders |
 | Version | 1.0 |
 | Date | September 2026 |
 
