@@ -119,6 +119,30 @@ def test_run_detection_cross_references_households_and_surveys_in_the_scar(clien
         admin_db.commit()
 
 
+def test_zone_image_endpoint_serves_real_png_bytes(client):
+    headers = _auth_headers(client, "sdma.official@ps191.dev")
+    zone_id = _zone_id(client, headers, "ZN-01")
+
+    before = client.get(f"/zones/{zone_id}/change-detections/image/before", headers=headers)
+    after = client.get(f"/zones/{zone_id}/change-detections/image/after", headers=headers)
+    assert before.status_code == 200
+    assert after.status_code == 200
+    assert before.headers["content-type"] == "image/png"
+    assert before.content[:8] == b"\x89PNG\r\n\x1a\n"  # real PNG magic bytes, not a placeholder string
+    assert before.content != after.content  # a genuine before/after pair, not the same file twice
+
+
+def test_zone_image_404s_for_zone_without_curated_imagery(client):
+    headers = _auth_headers(client, "sdma.official@ps191.dev")
+    zone_id = _zone_id(client, headers, "ZN-02")
+    assert client.get(f"/zones/{zone_id}/change-detections/image/before", headers=headers).status_code == 404
+
+
+def test_zone_image_requires_auth(client):
+    zone_id = "00000000-0000-0000-0000-000000000000"
+    assert client.get(f"/zones/{zone_id}/change-detections/image/before").status_code == 401
+
+
 def test_field_officer_cannot_run_or_list_for_unassigned_zone(client):
     officer_headers = _auth_headers(client, "field.officer@ps191.dev")
     sdma_headers = _auth_headers(client, "sdma.official@ps191.dev")

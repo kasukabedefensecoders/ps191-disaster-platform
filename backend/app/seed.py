@@ -52,11 +52,15 @@ HOUSEHOLDS = [
 # placeholder every shelter shared before Phase 5) — needed for real
 # distance to mean anything once shelter_matching.py computes it.
 SHELTERS = [
-    ("SH-01", "Ridge Higher Secondary School", 450, 180, {"water": True, "medical": True, "toilets": True, "power": True}, (93.0205, 25.1700)),
-    ("SH-02", "Block Community Hall", 200, 95, {"water": True, "toilets": True}, (93.1255, 25.3035)),
-    ("SH-03", "District Stadium Ground", 800, 120, {"water": True, "toilets": True, "power": True}, (93.0115, 25.1620)),
-    ("SH-04", "Block Office Complex", 150, 148, {"water": True, "medical": True, "toilets": True}, (92.7020, 25.4650)),
-    ("SH-05", "Tea Estate Godown", 300, 0, {"water": True}, (92.9580, 25.0320)),
+    # code, name, max_capacity, current_occupancy, facilities, (lon, lat), status, contact_name, contact_phone, needs
+    ("SH-01", "Ridge Higher Secondary School", 450, 180, {"water": True, "medical": True, "toilets": True, "power": True}, (93.0205, 25.1700), "active", "D. Langthasa", "+91 94350 11201", []),
+    ("SH-02", "Block Community Hall", 200, 95, {"water": True, "toilets": True}, (93.1255, 25.3035), "active", "P. Jeme", "+91 94350 11202", []),
+    ("SH-03", "District Stadium Ground", 800, 120, {"water": True, "toilets": True, "power": True}, (93.0115, 25.1620), "active", "S. Hojai", "+91 94350 11203", []),
+    ("SH-04", "Block Office Complex", 150, 148, {"water": True, "medical": True, "toilets": True}, (92.7020, 25.4650), "active", "R. Thaosen", "+91 94350 11204", ["food", "blankets"]),
+    # SH-05: PROTOTYPE/PS191 Platform.dc.html's own seed marks this shelter
+    # "Standby" (0 occupancy, held in reserve) — ported as the schema's new
+    # standby status rather than "active" with zero occupants.
+    ("SH-05", "Tea Estate Godown", 300, 0, {"water": True}, (92.9580, 25.0320), "standby", "N. Barman", "+91 94350 11205", []),
 ]
 
 # zone_code -> incident_history rows (docs/BACKEND-SCHEMA.md §6.2 shape),
@@ -101,13 +105,22 @@ SEED_PASSWORD = "ps191-demo-pass"
 # field officer's assigned zones for the RLS test to have something to check
 FIELD_OFFICER_ZONES = ["ZN-01", "ZN-03"]
 
-# vehicle_type, capacity — ported from the prototype's move MV-118 example
-# ("Truck AS-04 · cap 24"); vehicles/escorts aren't in CLAUDE.md's
-# display-code list (only relocation records — "MV-xxx" — are), so these
-# are referenced by UUID only, same as the schema defines them.
+# display_code, vehicle_type, capacity, route_label — the 2 trucks are
+# ported from the prototype's move MV-118 example ("Truck AS-04 · cap 24");
+# the 5 buses are new (Logistics Tracker's bus-consolidation cards, migration
+# 0005) so several households can ride the same vehicle to the same shelter.
+# Road transport only, deliberately: this platform is pre-disaster predictive
+# relocation (moving people out ahead of a forecast hazard, not rescuing them
+# mid-flood), so the seeded fleet assumes the road network is still intact —
+# no boats/amphibious vehicles here even for the flood zones (ZN-02/ZN-04).
 VEHICLES = [
-    ("Truck", 24),
-    ("Truck", 18),
+    ("VH-01", "Truck", 24, None),
+    ("VH-02", "Truck", 18, None),
+    ("BUS-01", "Bus", 50, "Ridge Route"),
+    ("BUS-02", "Bus", 50, "Maibang Route"),
+    ("BUS-03", "Bus", 50, "Stadium Route"),
+    ("BUS-04", "Bus", 50, "Ridge Route B"),
+    ("BUS-05", "Bus", 50, "Maibang Route B"),
 ]
 
 # full_name, agency — ported from the prototype's "NDRF Sqd 2 · 3 pax"
@@ -227,7 +240,7 @@ def seed() -> None:
             )
             db.add(household)
 
-        for code, name, max_capacity, current_occupancy, facilities, (lon, lat) in SHELTERS:
+        for code, name, max_capacity, current_occupancy, facilities, (lon, lat), status, contact_name, contact_phone, needs in SHELTERS:
             shelter = Shelter(
                 shelter_id=uuid.uuid4(),
                 display_code=code,
@@ -237,12 +250,25 @@ def seed() -> None:
                 max_capacity=max_capacity,
                 current_occupancy=current_occupancy,
                 facilities=facilities,
+                status=status,
+                contact_name=contact_name,
+                contact_phone=contact_phone,
+                needs=needs,
             )
             db.add(shelter)
         db.flush()
 
-        for vehicle_type, capacity in VEHICLES:
-            db.add(Vehicle(vehicle_id=uuid.uuid4(), district_id=district.district_id, vehicle_type=vehicle_type, capacity=capacity))
+        for display_code, vehicle_type, capacity, route_label in VEHICLES:
+            db.add(
+                Vehicle(
+                    vehicle_id=uuid.uuid4(),
+                    district_id=district.district_id,
+                    display_code=display_code,
+                    route_label=route_label,
+                    vehicle_type=vehicle_type,
+                    capacity=capacity,
+                )
+            )
 
         for full_name, agency in ESCORTS:
             db.add(Escort(escort_id=uuid.uuid4(), full_name=full_name, agency=agency))

@@ -26,7 +26,7 @@ PRIORITY_TIER = ENUM(
 )
 
 SHELTER_STATUS = ENUM(
-    "active", "full", "closed", "damaged",
+    "active", "standby", "full", "closed", "damaged",
     name="shelter_status", create_type=False,
 )
 

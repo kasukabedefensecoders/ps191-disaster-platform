@@ -267,6 +267,9 @@ create table shelters (
   current_occupancy integer not null default 0 check (current_occupancy >= 0),
   facilities jsonb not null default '{}',
   status shelter_status not null default 'active',
+  contact_name text,
+  contact_phone text,
+  needs jsonb not null default '[]',
   last_updated_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -278,6 +281,8 @@ create index idx_shelters_status on shelters(status);
 ```
 
 The capacity check is enforced at the database level, not just the Shelter & Allocation Engine — a shelter cannot be over-allocated even by a bug or a race between two concurrent relocation writes (TRD §7.4/§7.5).
+
+**Migration 0004** added `contact_name`/`contact_phone` (a reachable person for the shelter, surfaced by the Shelter Registration & Management dashboard) and `needs` — a free-form jsonb array of urgent-need tags (`["medical", "food", "water", "blankets", ...]`) a field officer or SDMA official can update independent of `facilities`, which describes what the shelter has, not what it currently lacks. `shelter_status` also gained a 5th value, `standby`: a shelter that is stood up and ready but not currently housing anyone, distinct from `active` (occupied/operating), `full`, `closed`, and `damaged`. This matches a state the prototype's own copy referenced ("SH-05 moved from standby to active roster") but never wired into its seed shelter's `status` field — SH-05 (Tea Estate Godown, 0/300 occupied) is seeded as `standby` here.
 
 ### 5.6 `surveys`
 
@@ -318,6 +323,8 @@ Not in TRD §5's table, added because `relocation_records.vehicle_id` (TRD §5) 
 create table vehicles (
   vehicle_id uuid primary key default gen_random_uuid(),
   district_id uuid not null references districts(district_id),
+  display_code text unique,
+  route_label text,
   vehicle_type text not null,
   capacity integer not null check (capacity > 0),
   status vehicle_status not null default 'available',
@@ -329,6 +336,8 @@ create table vehicles (
 create index idx_vehicles_district on vehicles(district_id);
 create index idx_vehicles_status on vehicles(status);
 ```
+
+`display_code` (e.g. `BUS-01`) joins the display-code convention §2 already uses for zones/households/shelters/relocation_records/surveys/handoff_logs/routes — added in migration 0005 once the Logistics Tracker started grouping several `relocation_records` onto one vehicle and needed something human-readable to label the card. `route_label` (e.g. `"Ridge Route"`) names the run, not the vehicle class (`vehicle_type` already carries Bus/Truck) — nullable, since an ad hoc truck run isn't necessarily a named route. A vehicle's capacity is no longer "one relocation_record at a time": `relocation_records.vehicle_id` can point to several records concurrently (several households riding the same bus), constrained at the application layer to `sum(population_count) over non-arrived records for that vehicle <= capacity`, not by a DB constraint — see `services/relocations.py`.
 
 ### 5.8 `escorts`
 
@@ -688,6 +697,8 @@ create policy relocation_access on relocation_records
 `app.current_role` and `app.current_user_id` are set per-connection by the FastAPI request middleware from the JWT (TRD §10) before any query runs, via `select set_config('app.current_role', ..., false)` — parameterized, not string-interpolated into a `SET LOCAL` statement. The third argument is `false` (session-scoped, not transaction-local) deliberately: Phase 3 found that a transaction-local setting silently resets after the *first* `commit()` in a request, so a handler that commits and then reads back what it just wrote (e.g. create a zone, then re-fetch it to build the response) would lose its role context on the second query and see nothing — RLS hiding a row from the very request that inserted it. Session-scoped is safe here specifically because every RLS-sensitive request sets this unconditionally before its first protected query, so a reused pooled connection never runs a query against households/zones/surveys/relocation_records on context left over from a previous request. The same policy shape applies to `zones` (an officer's map view is naturally scoped to what they're assigned to survey, per TRD §7.10's prioritized survey queue), `surveys` (an officer only sees submissions for their assigned zones), and `relocation_records` (an officer only sees relocation decisions for households in their assigned zones). `sdma_official` and `control_room` bypass the zone filter entirely, matching their "full dashboard access" / "read-only dashboard access during active events" roles (TRD §10).
 
 **`FORCE ROW LEVEL SECURITY` is not optional here, and neither is a dedicated application role.** Postgres table owners — and superusers, unconditionally — bypass RLS policies by default; `FORCE ROW LEVEL SECURITY` closes the owner loophole but still does nothing for a superuser. The Docker Compose `POSTGRES_USER` (`ps191`) is created as a Postgres superuser and owns every table (it runs the Alembic migrations), so if the FastAPI app connected as `ps191`, every policy above would compile and silently do nothing — exactly the undetectable-in-a-demo failure mode rule 7 warns about. Migration `0002` therefore creates a second, non-superuser role, `app_user`, granted only `SELECT`/`INSERT`/`UPDATE` on the schema (`SELECT`/`INSERT` only on `audit_log`, per rule 2) and no `BYPASSRLS` attribute. `ps191` remains the migration/owner connection (`MIGRATION_DATABASE_URL`, used only by Alembic); the running application and the seed script connect as `app_user` (`DATABASE_URL`). Both are set in `docker-compose.yml`/`.env`.
+
+**`app_user` has no blanket `DELETE` — migrations `0006` and `0007` grant it on exactly five tables.** Nothing in the app deleted rows at all until the judge-facing "Reset demo data" action (`services/demo_seed.py`) needed to tear down `relocation_records`/`surveys` and their dependents (`handoff_logs`, `incident_outcomes`, both FK'd to `relocation_records` with no `ON DELETE` clause, so they have to go first) before reseeding, so those four tables got a scoped `DELETE` grant (migration `0006`) rather than widening the migration `0002` grant to every table. Migration `0007` adds a fifth, `risk_forecasts`, once the same reset action grew to also put each zone's 72h risk score back to its seeded baseline — the "Generate" forecast button's per-cycle rainfall jitter means repeated clicks genuinely diverge from that baseline, so resetting it means deleting the generated rows, not just recomputing something. `audit_log` stays out of reach exactly as before: the demo reset never touches it, and `app_user` still has no `UPDATE`/`DELETE` privilege on it regardless. RLS already covered `DELETE` on `relocation_records`/`surveys` without any policy change, since both policies are declared `FOR ALL` (no `FOR` clause) rather than command-scoped; `risk_forecasts` and `zones` carry no RLS policy of their own to begin with (zones has a `SELECT`-shaped policy only — see its own entry above), so the grant alone is what the reset needed.
 
 ## 8. Indexing Summary
 

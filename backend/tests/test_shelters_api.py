@@ -56,6 +56,56 @@ def test_only_sdma_official_can_create_and_update_shelters(client, admin_db):
         admin_db.commit()
 
 
+def test_field_officer_cannot_write_shelters_at_all(client):
+    """Shelter management is sdma_official (registration/oversight) and each
+    shelter's own officer (POST /auth/shelter-login, PATCH /shelters/me)
+    only. field_officer previously had a narrow occupancy/needs edit here,
+    now retired now that the shelter officer dashboard owns that data."""
+    officer_headers = _auth_headers(client, "field.officer@ps191.dev")
+    shelter = client.get("/shelters", headers=officer_headers).json()["items"][0]
+    denied = client.patch(
+        f"/shelters/{shelter['shelter_id']}",
+        headers=officer_headers,
+        json={"current_occupancy": shelter["current_occupancy"]},
+    )
+    assert denied.status_code == 403
+
+
+def test_control_room_cannot_write_shelters(client):
+    control_headers = _auth_headers(client, "control.room@ps191.dev")
+    shelter = client.get("/shelters", headers=control_headers).json()["items"][0]
+    assert client.patch(f"/shelters/{shelter['shelter_id']}", headers=control_headers, json={"current_occupancy": 1}).status_code == 403
+
+
+def test_create_shelter_accepts_standby_status_contact_and_needs(client, admin_db):
+    sdma_headers = _auth_headers(client, "sdma.official@ps191.dev")
+    district_id = client.get("/shelters", headers=sdma_headers).json()["items"][0]["district_id"]
+
+    payload = {
+        "display_code": f"SH-TEST-{uuid.uuid4().hex[:8]}",
+        "district_id": district_id,
+        "name": "Standby Test Shelter",
+        "geom": {"type": "Point", "coordinates": [93.05, 25.15]},
+        "max_capacity": 100,
+        "current_occupancy": 0,
+        "facilities": {"water": True, "power": True},
+        "status": "standby",
+        "contact_name": "Test Contact",
+        "contact_phone": "+91 90000 00000",
+        "needs": ["food"],
+    }
+    created = client.post("/shelters", headers=sdma_headers, json=payload)
+    try:
+        assert created.status_code == 201
+        body = created.json()
+        assert body["status"] == "standby"
+        assert body["contact_name"] == "Test Contact"
+        assert body["needs"] == ["food"]
+    finally:
+        admin_db.execute(text("delete from shelters where shelter_id = :id"), {"id": created.json()["shelter_id"]})
+        admin_db.commit()
+
+
 def test_occupancy_over_capacity_returns_400_not_500(client, admin_db):
     sdma_headers = _auth_headers(client, "sdma.official@ps191.dev")
     district_id = client.get("/shelters", headers=sdma_headers).json()["items"][0]["district_id"]

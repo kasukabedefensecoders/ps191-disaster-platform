@@ -1,32 +1,49 @@
+import type { ReactNode } from "react";
+
 import { riskColor } from "../lib/riskColor";
+import { useTheme } from "../lib/ThemeContext";
 import type { DataConfidence, HandoffStatus, PriorityTier } from "../lib/api";
 
-const HANDOFF_COLOR: Record<HandoffStatus, string> = {
-  open: "var(--sev1)",
-  acknowledged: "var(--sev3)",
-  in_progress: "var(--sev3)",
-  resolved: "var(--sev5)",
-};
-
-// Phase 12: "status flag surfaced on the dashboard" — this is that flag.
-export function HandoffStatusBadge({ status }: { status: HandoffStatus }) {
+/** Filled tier/status pill — ported from the prototype's "IMMEDIATE"/
+ * "REVIEW"/"HANDOFF" chips (PS191 Platform.dc.html: padding 4px 6px,
+ * radius 3, a tinted surface + border + matched ink per severity step,
+ * docs/DESIGN-SYSTEM.md §2.3's "matched ink and surface pair"). */
+function Pill({ bg, border, ink, children }: { bg: string; border: string; ink: string; children: ReactNode }) {
   return (
     <span
       style={{
         fontFamily: "var(--font-data)",
         fontSize: 10,
-        fontWeight: 600,
+        fontWeight: 500,
         letterSpacing: "0.03em",
-        padding: "2px 7px",
+        padding: "4px 6px",
         borderRadius: 3,
-        color: HANDOFF_COLOR[status],
-        border: `1px solid ${HANDOFF_COLOR[status]}`,
+        background: bg,
+        color: ink,
+        border: `1px solid ${border}`,
         textTransform: "uppercase",
         whiteSpace: "nowrap",
       }}
     >
-      {status.replace("_", " ")}
+      {children}
     </span>
+  );
+}
+
+const HANDOFF_PILL: Record<HandoffStatus, { bg: string; border: string; ink: string }> = {
+  open: { bg: "var(--t1-bg)", border: "var(--t1-border)", ink: "var(--sev2-ink)" },
+  acknowledged: { bg: "var(--t2-bg)", border: "var(--t2-border)", ink: "var(--sev3-ink)" },
+  in_progress: { bg: "var(--t2-bg)", border: "var(--t2-border)", ink: "var(--sev3-ink)" },
+  resolved: { bg: "var(--ok-bg)", border: "var(--ok-border)", ink: "var(--sev5-ink)" },
+};
+
+// Phase 12: "status flag surfaced on the dashboard" — this is that flag.
+export function HandoffStatusBadge({ status }: { status: HandoffStatus }) {
+  const p = HANDOFF_PILL[status];
+  return (
+    <Pill bg={p.bg} border={p.border} ink={p.ink}>
+      {status.replace("_", " ")}
+    </Pill>
   );
 }
 
@@ -38,30 +55,18 @@ const TIER_LABEL: Record<PriorityTier, string> = {
 // app/scoring/priority.py's prio_tier thresholds (0.68 / 0.48), not the
 // design system's separate 5-band raw-risk scale — same colour tokens,
 // different axis (see riskColor.ts's own note on this distinction).
-const TIER_COLOR: Record<PriorityTier, string> = {
-  immediate: "var(--sev1)",
-  short_term: "var(--sev3)",
-  medium_term: "var(--sev4)",
+const TIER_PILL: Record<PriorityTier, { bg: string; border: string; ink: string }> = {
+  immediate: { bg: "var(--t1-bg)", border: "var(--t1-border)", ink: "var(--sev2-ink)" },
+  short_term: { bg: "var(--t2-bg)", border: "var(--t2-border)", ink: "var(--sev3-ink)" },
+  medium_term: { bg: "var(--t3-bg)", border: "var(--t3-border)", ink: "var(--sev4-ink)" },
 };
 
 export function TierBadge({ tier }: { tier: PriorityTier }) {
+  const p = TIER_PILL[tier];
   return (
-    <span
-      style={{
-        fontFamily: "var(--font-data)",
-        fontSize: 10,
-        fontWeight: 600,
-        letterSpacing: "0.04em",
-        padding: "2px 7px",
-        borderRadius: 3,
-        color: TIER_COLOR[tier],
-        border: `1px solid ${TIER_COLOR[tier]}`,
-        textTransform: "uppercase",
-        whiteSpace: "nowrap",
-      }}
-    >
+    <Pill bg={p.bg} border={p.border} ink={p.ink}>
       {TIER_LABEL[tier]}
-    </span>
+    </Pill>
   );
 }
 
@@ -102,7 +107,8 @@ export function OutcomeBadge({ label, value }: { label: string; value: boolean |
 }
 
 export function RiskChip({ score }: { score: number | null }) {
-  const color = riskColor(score);
+  const { theme } = useTheme();
+  const color = riskColor(score, theme);
   return (
     <span style={{ fontFamily: "var(--font-data)", fontWeight: 600, fontSize: 13, color }}>
       {score === null ? "—" : Math.round(score * 100)}
@@ -110,23 +116,47 @@ export function RiskChip({ score }: { score: number | null }) {
   );
 }
 
-// rule 6: sample/seeded data is never presented without this marker.
+// rule 6: sample/seeded data is never presented without this marker —
+// ported verbatim from the prototype's header chip (line 348: an outlined
+// mono pill, not a filled red one).
 export function SampleDataBadge() {
   return (
     <span
       style={{
         fontFamily: "var(--font-data)",
-        fontSize: 9.5,
-        letterSpacing: "0.05em",
-        padding: "3px 7px",
+        fontWeight: 500,
+        fontSize: 9,
+        letterSpacing: "0.1em",
+        padding: "5px 7px",
         borderRadius: 3,
-        background: "rgba(184,12,9,0.15)",
-        color: "var(--sev1)",
-        border: "1px solid rgba(184,12,9,0.4)",
+        border: "1px solid var(--border2)",
+        color: "var(--ink3)",
         whiteSpace: "nowrap",
       }}
     >
       SAMPLE DATA
+    </span>
+  );
+}
+
+// Prototype header chip (line 350): shown only for a read-only role.
+export function ReadOnlySessionBadge() {
+  return (
+    <span
+      style={{
+        fontFamily: "var(--font-data)",
+        fontWeight: 500,
+        fontSize: 9,
+        letterSpacing: "0.1em",
+        padding: "5px 7px",
+        borderRadius: 3,
+        border: "1px solid var(--sev3)",
+        background: "var(--t2-bg)",
+        color: "var(--warn-ink)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      READ-ONLY SESSION
     </span>
   );
 }

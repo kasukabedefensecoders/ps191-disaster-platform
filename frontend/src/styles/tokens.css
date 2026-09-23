@@ -1,6 +1,7 @@
-/* docs/DESIGN-SYSTEM.md §2 — dark theme only for now (the design doc's
-   light-theme override isn't wired here; this is the core dashboard shell,
-   not full 18-screen fidelity — see the Phase 8 note in BUILD-PLAN.md). */
+/* Ported directly from PROTOTYPE/PS191 Platform.dc.html's <style> block
+   (docs/DESIGN-SYSTEM.md §2) — same token names/values, same motion
+   keyframes and transition timing, so the built app matches the prototype
+   pixel-for-pixel rather than approximating it. */
 :root {
   --bg: #070b16;
   --bg2: #0a1020;
@@ -8,6 +9,8 @@
   --panel2: #0f1730;
   --track: #111b31;
   --row-sel: #101c38;
+  --row-hover: #101a30;
+  --row-hover2: #16213c;
   --border: #1d2a45;
   --border2: #2a3b5e;
   --border-soft: #141e35;
@@ -18,16 +21,146 @@
   --ink4: #7c8db0;
   --ink5: #5b6b8c;
 
-  /* risk-severity scale (§2.3) — immediate/short_term/medium_term tiers
-     and zone risk bands both read through this, never a raw hex */
+  --accent: #06bee1;
+  --accent-hi: #5fd8f0;
+  --on-accent: #04222a;
+  --blue: #2541b2;
+  --blue-bg: #0f2044;
+  --blue-ink: #9fc4ff;
+  --blue-bg-hi: #16306b;
+  --cy-bg: #001d24;
+  --cy-ink: #7fe3f7;
+  --cy-bg-hi: #00323e;
+  --brand-deep: #03256c;
+  --on-brand: #06bee1;
+  --ocean: #1768ac;
+
   --sev1: #b80c09;
   --sev2: #db222a;
   --sev3: #fd9e02;
   --sev4: #8fc93a;
   --sev5: #32e875;
+  --sev2-ink: #ff9a9e;
+  --sev3-ink: #ffc470;
+  --sev4-ink: #c3e78a;
+  --sev5-ink: #7bf0a8;
+
+  --t1-bg: #2a0507;
+  --t1-border: #6b1216;
+  --t1-bg-hi: #43090c;
+  --t2-bg: #2a1b00;
+  --t2-border: #6b4a00;
+  --t3-bg: #16250a;
+  --t3-border: #3f5c18;
+  --ok-bg: #07240f;
+  --ok-border: #1d5c33;
+  --ok-bg-hi: #0c3a19;
+  --alert-bg: #15050a;
+  --alert-ink: #ffd9db;
+  --alert-ink2: #d69a9d;
+  --pill-bg: #1a0507;
+  --pill-border: #5c1114;
+  --warn-ink: #ffe6c2;
+  --warn-ink2: #c9a06a;
+  --ok-ink2: #9ab86f;
+  --on-sev: #ffffff;
+
+  --hz-flood: #7fb0ee;
+  --hz-slide: #c79a6b;
+  --hz-burst: #a996e8;
+  --hz-coast: #6fcfc7;
+  --shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
 
   --font-interface: "Schibsted Grotesk", system-ui, sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+[data-theme="light"] {
+  --bg: #f4f6f9;
+  --bg2: #ffffff;
+  --panel: #ffffff;
+  --panel2: #f4f6f9;
+  --track: #e7ebf1;
+  --row-sel: #e8effb;
+  --row-hover: #f1f4f9;
+  --row-hover2: #e8effb;
+  --border: #dde3ec;
+  --border2: #c3cddc;
+  --border-soft: #edf0f5;
+
+  --ink: #0f1620;
+  --ink2: #27313f;
+  --ink3: #4c596c;
+  --ink4: #5c6878;
+  --ink5: #6b7787;
+
+  --accent: #2f6fe0;
+  --accent-hi: #1b56c4;
+  --on-accent: #ffffff;
+  --blue: #2f6fe0;
+  --blue-bg: #e8effb;
+  --blue-ink: #1b4ea8;
+  --blue-bg-hi: #d6e4fa;
+  --cy-bg: #e4f2f0;
+  --cy-ink: #1c6a60;
+  --cy-bg-hi: #d2e9e5;
+  --brand-deep: #2f6fe0;
+  --on-brand: #ffffff;
+  --ocean: #2f6fe0;
+
+  --sev1: #d32e22;
+  --sev2: #d32e22;
+  --sev3: #d98f1f;
+  --sev4: #c9a93a;
+  --sev5: #2e8a7d;
+  --sev2-ink: #96201a;
+  --sev3-ink: #7a4e0b;
+  --sev4-ink: #655517;
+  --sev5-ink: #1c6a60;
+
+  --t1-bg: #fceae8;
+  --t1-border: #efc3bf;
+  --t1-bg-hi: #f8dad6;
+  --t2-bg: #fdf3e2;
+  --t2-border: #ebd9b2;
+  --t3-bg: #faf6e1;
+  --t3-border: #e5dcaf;
+  --ok-bg: #e6f4f1;
+  --ok-border: #b6ded6;
+  --ok-bg-hi: #d5ebe6;
+  --alert-bg: #fdecea;
+  --alert-ink: #7f1d17;
+  --alert-ink2: #96201a;
+  --pill-bg: #fdecea;
+  --pill-border: #efc3bf;
+  --warn-ink: #7a4e0b;
+  --warn-ink2: #8a6524;
+  --ok-ink2: #5a6a2a;
+  --on-sev: #ffffff;
+
+  --hz-flood: #2c68b8;
+  --hz-slide: #7d5530;
+  --hz-burst: #6a4fb0;
+  --hz-coast: #268888;
+  --shadow: 0 10px 30px rgba(15, 22, 32, 0.14);
+}
+
+button,
+input,
+textarea,
+a {
+  transition:
+    background 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+button:active {
+  transform: scale(0.97);
+}
+main {
+  scroll-behavior: smooth;
 }
 
 * {
@@ -45,14 +178,352 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-interface);
+  -webkit-font-smoothing: antialiased;
 }
 
 input,
 button,
-select {
+select,
+textarea {
   font-family: inherit;
 }
 
 a {
-  color: inherit;
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--accent-hi);
+}
+
+/* Chrome autofill otherwise forces its own light background regardless of
+   the input's own styling — force it back to the panel colour. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--panel) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* PROTOTYPE/dima-hasao-map.html's own trick: both of ZoneMap's tile tiers
+   are always-light OSM tiles with no dark variant of their own (see
+   ZoneMap.tsx's module comment — the "free real dark tiles" providers that
+   used to fill this role, Esri then CartoDB, each quietly started requiring
+   an API key), so dark theme inverts/hue-rotates them instead of leaving
+   the map stuck in light mode. Unconditional — every tile tier gets it. */
+[data-theme="dark"] .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(185deg) brightness(0.86) contrast(0.88) saturate(0.5);
+}
+[data-theme="dark"] .leaflet-control-attribution {
+  background: rgba(10, 16, 32, 0.82) !important;
+  color: var(--ink3) !important;
+}
+[data-theme="dark"] .leaflet-control-attribution a {
+  color: var(--accent) !important;
+}
+[data-theme="dark"] .leaflet-bar a {
+  background: var(--panel);
+  color: var(--ink2);
+  border-color: var(--border);
+}
+
+/* Leaflet's own popup AND tooltip chrome both ship hardcoded white/black
+   with a generic sans-serif — unstyled, they're the one place hovering or
+   clicking a zone would break straight out of the app's visual language
+   (most jarring in dark mode: a bright white box). Retheme both through the
+   same tokens as everything else, in both themes, rather than leaving
+   Leaflet's defaults untouched. */
+.leaflet-tooltip {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  box-shadow: var(--shadow);
+  font: 500 11.5px/1.4 var(--font-interface);
+  padding: 6px 9px;
+}
+.leaflet-tooltip-top:before {
+  border-top-color: var(--border);
+}
+.leaflet-tooltip-bottom:before {
+  border-bottom-color: var(--border);
+}
+.leaflet-tooltip-left:before {
+  border-left-color: var(--border);
+}
+.leaflet-tooltip-right:before {
+  border-right-color: var(--border);
+}
+
+.leaflet-popup-content-wrapper {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+.leaflet-popup-content {
+  margin: 12px 14px;
+  font: 400 12.5px/1.6 var(--font-interface);
+  color: var(--ink2);
+}
+.leaflet-popup-content b {
+  color: var(--ink);
+}
+.leaflet-popup-tip-container {
+  overflow: hidden;
+}
+.leaflet-popup-tip {
+  background: var(--panel);
+  box-shadow: none;
+  border: 1px solid var(--border);
+}
+.leaflet-popup-close-button {
+  color: var(--ink3) !important;
+}
+.leaflet-popup-close-button:hover {
+  color: var(--ink) !important;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+[data-reveal] {
+  animation: riseIn 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes barGrow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+/* Sign-in modal (SignInModal.tsx) enter/exit — the same restrained
+   fade+rise as [data-reveal] above, not a competing motion language, just
+   applied to an overlay+card pair instead of a page section. The card
+   unmounts on a delay matching modalCardOut's duration (see the
+   component's own closing-state comment) so "close" reads as a real exit
+   rather than a hard cut. */
+@keyframes modalOverlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes modalOverlayOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes modalCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes modalCardOut {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+[data-modal-overlay] {
+  animation: modalOverlayIn 0.18s ease both;
+}
+[data-modal-overlay][data-closing="true"] {
+  animation: modalOverlayOut 0.15s ease both;
+}
+[data-modal-card] {
+  animation: modalCardIn 0.22s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+[data-modal-card][data-closing="true"] {
+  animation: modalCardOut 0.15s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+/* Restrained glow for the one or two things per screen that should read as
+   "active" beyond a colour change alone — an accent-tinted outer shadow
+   using each theme's own --accent, so it's never a foreign colour. Used
+   sparingly (selected role in the sign-in modal, the active nav item), not
+   stacked onto every hover state. */
+.ps-glow-accent {
+  box-shadow: 0 0 0 1px var(--accent), 0 0 16px -4px var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  [data-reveal],
+  [data-modal-overlay],
+  [data-modal-card] {
+    opacity: 1;
+  }
+}
+
+/* Reusable hover treatments (the prototype's dc-runtime applies these via a
+   style-hover="" attribute; plain React inline styles can't express :hover,
+   so the same visual rules are real CSS classes here instead). */
+.ps-nav-btn:hover {
+  background: var(--row-hover);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.ps-card-hover:hover {
+  transform: translateY(-3px);
+  border-color: var(--border2);
+  box-shadow: var(--shadow);
+}
+.ps-row-hover:hover {
+  background: var(--row-hover);
+}
+.ps-btn-primary:hover {
+  background: var(--accent-hi);
+  transform: translateY(-1px);
+}
+.ps-btn-outline:hover {
+  background: var(--blue-bg);
+  transform: translateY(-1px);
+}
+.ps-icon-btn:hover {
+  background: var(--row-hover2);
+  transform: translateY(-1px);
+}
+.ps-btn-confirm:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+/* Landing page role cards (Landing.tsx) — the arrow is invisible until
+   hover, a small "this is a button" affordance rather than a permanent
+   fixture competing with the title. */
+.ps-role-card-arrow {
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.ps-role-card:hover .ps-role-card-arrow {
+  opacity: 1;
+  transform: none;
+}
+
+/* The landing hero's map preview gets one signature motif: a slow scan
+   sweeping down the frame, like a monitoring console — drawn from the
+   subject matter (live hazard monitoring), not decoration for its own
+   sake. Runs once every 6s, quiet the rest of the time. */
+@keyframes scanSweep {
+  0% {
+    top: -25%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.55;
+  }
+  45% {
+    opacity: 0.55;
+  }
+  60% {
+    opacity: 0;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+.ps-scan-sweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 30%;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--accent) 22%, transparent) 50%, transparent);
+  pointer-events: none;
+  animation: scanSweep 6s ease-in-out infinite;
+  z-index: 450;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ps-scan-sweep {
+    display: none;
+  }
+}
+
+/* Landing hero's text+map columns — a fixed minmax(320px, ...) second
+   column forces horizontal overflow once the viewport can't fit both at
+   once, so it collapses to one column below the width where that stops
+   fitting comfortably. */
+.ps-hero-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.85fr);
+}
+@media (max-width: 860px) {
+  .ps-hero-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* A small inline spinner for "Generating…"/"Running…" action buttons
+   (Forecast.tsx, ZoneDetail.tsx) — currentColor so it reads correctly on
+   both the accent-filled primary button and any future outline use. */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ps-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ps-spinner {
+    animation-duration: 1.4s;
+  }
 }

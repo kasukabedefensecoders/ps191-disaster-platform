@@ -115,6 +115,23 @@ def run_detection_for_zone(db: Session, zone_id: uuid.UUID) -> ChangeDetectionOu
     return _to_out(row[0], row[1])
 
 
+def get_zone_image(db: Session, zone_id: uuid.UUID, which: str) -> bytes | None:
+    """Returns None if the zone isn't visible or has no curated imagery.
+    Raises ChangeDetectionError for an invalid `which`. Used to actually
+    serve the before/after pair to the frontend — the change-detection API
+    only ever returned MinIO object keys, never the bytes themselves."""
+    if which not in ("before", "after"):
+        raise ChangeDetectionError("which must be 'before' or 'after'")
+    zone = db.get(Zone, zone_id)
+    if zone is None:
+        return None
+    before_key, after_key = _image_keys(zone.display_code)
+    key = before_key if which == "before" else after_key
+    if not object_exists(key):
+        return None
+    return download_bytes(key)
+
+
 def list_zone_detections(db: Session, zone_id: uuid.UUID, limit: int) -> list[ChangeDetectionOut] | None:
     zone = db.get(Zone, zone_id)
     if zone is None:

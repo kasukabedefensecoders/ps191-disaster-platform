@@ -145,6 +145,14 @@ def test_status_transitions_are_forward_only_and_free_transport_on_arrival(clien
         vehicle_final = client.get("/vehicles", headers=headers, params={"status": "available"}).json()
         assert vehicle_id in {v["vehicle_id"] for v in vehicle_final}
     finally:
+        # Arrival also bumped SH-03's occupancy by HH-107's population_count
+        # and auto-raised handoffs for its children/elderly (Change 3) —
+        # both need undoing too, or they outlive this test.
+        admin_db.execute(text("delete from handoff_logs where linked_record_id = :id"), {"id": record_id})
+        admin_db.execute(
+            text("update shelters set current_occupancy = current_occupancy - 4 where shelter_id = :id"),
+            {"id": shelter_id},
+        )
         admin_db.execute(text("delete from audit_log where entity_id = :id"), {"id": record_id})
         admin_db.execute(text("delete from relocation_records where record_id = :id"), {"id": record_id})
         admin_db.execute(text("update vehicles set status = 'available' where vehicle_id = :id"), {"id": vehicle_id})
@@ -177,6 +185,11 @@ def test_field_officer_cannot_read_relocation_outside_assigned_zones(client, adm
     )
     assert created.status_code == 201
     record_id = created.json()["record_id"]
+    # No vehicle_id was passed, so create_relocation auto-assigned whatever
+    # was available (Change 2's auto vehicle assignment) — release it too,
+    # or it stays stuck "assigned" for the rest of the test session with
+    # only 2 seeded trucks to go around.
+    vehicle_id = created.json()["vehicle_id"]
 
     try:
         # sdma_official (bypasses RLS) can still see it.
@@ -192,4 +205,6 @@ def test_field_officer_cannot_read_relocation_outside_assigned_zones(client, adm
     finally:
         admin_db.execute(text("delete from audit_log where entity_id = :id"), {"id": record_id})
         admin_db.execute(text("delete from relocation_records where record_id = :id"), {"id": record_id})
+        if vehicle_id is not None:
+            admin_db.execute(text("update vehicles set status = 'available' where vehicle_id = :id"), {"id": vehicle_id})
         admin_db.commit()

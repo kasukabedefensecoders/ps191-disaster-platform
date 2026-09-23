@@ -24,9 +24,12 @@ def db():
 
 
 # Connects as the migration/owner role (bypasses RLS) so tests can clean up
-# rows they created through the API — app_user has no DELETE grant by
-# design (Backend Schema §7), so cleanup can't go through the app's own
-# session. Only ever used for test teardown, never application logic.
+# rows they created through the API — app_user has DELETE only on the four
+# tables migration 0006 scoped it to (relocation_records, surveys,
+# handoff_logs, incident_outcomes; Backend Schema §7), and none at all on
+# everything else (zones, households, audit_log, ...), so cleanup generally
+# can't go through the app's own session. Only ever used for test teardown,
+# never application logic.
 _AdminSession = sessionmaker(bind=create_engine(settings.migration_database_url))
 
 

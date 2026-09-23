@@ -44,6 +44,9 @@ def _to_shelter_out(shelter: Shelter, geom_geojson: str, cls=ShelterOut, **extra
         current_occupancy=shelter.current_occupancy,
         facilities=shelter.facilities or {},
         status=shelter.status,
+        contact_name=shelter.contact_name,
+        contact_phone=shelter.contact_phone,
+        needs=shelter.needs or [],
         last_updated_at=shelter.last_updated_at,
         created_at=shelter.created_at,
         updated_at=shelter.updated_at,
@@ -81,6 +84,9 @@ def create_shelter(db: Session, payload: ShelterCreate) -> ShelterOut:
         current_occupancy=payload.current_occupancy,
         facilities=payload.facilities,
         status=payload.status,
+        contact_name=payload.contact_name,
+        contact_phone=payload.contact_phone,
+        needs=payload.needs,
     )
     db.add(shelter)
     _commit_or_raise_capacity_error(db)

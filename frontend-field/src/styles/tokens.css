@@ -1,0 +1,108 @@
+/* Mirrors frontend/src/styles/tokens.css, ported from
+   PROTOTYPE/PS191 Platform.dc.html's <style> block (docs/DESIGN-SYSTEM.md
+   §2). Kept as a duplicate rather than a shared package since the field
+   app and dashboard are intentionally separate Vite projects (TRD §4). */
+:root {
+  --bg: #070b16;
+  --bg2: #0a1020;
+  --panel: #0d1426;
+  --panel2: #0f1730;
+  --track: #111b31;
+  --row-sel: #101c38;
+  --row-hover: #101a30;
+  --row-hover2: #16213c;
+  --border: #1d2a45;
+  --border2: #2a3b5e;
+  --border-soft: #141e35;
+
+  --ink: #e9eef8;
+  --ink2: #c6d2e8;
+  --ink3: #8d9cb8;
+  --ink4: #7c8db0;
+  --ink5: #5b6b8c;
+
+  --accent: #06bee1;
+  --accent-hi: #5fd8f0;
+  --on-accent: #04222a;
+  --blue: #2541b2;
+  --blue-bg: #0f2044;
+  --brand-deep: #03256c;
+  --on-brand: #06bee1;
+
+  --sev1: #b80c09;
+  --sev2: #db222a;
+  --sev3: #fd9e02;
+  --sev4: #8fc93a;
+  --sev5: #32e875;
+
+  --font-interface: "Schibsted Grotesk", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-interface);
+  -webkit-font-smoothing: antialiased;
+}
+
+input,
+button,
+select,
+textarea {
+  font-family: inherit;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--panel) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+button,
+input,
+textarea,
+a {
+  transition:
+    background 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+button:active {
+  transform: scale(0.97);
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

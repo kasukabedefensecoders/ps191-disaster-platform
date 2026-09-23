@@ -6,20 +6,32 @@ import type { Zone } from "../lib/api";
 import { riskColor, type Theme } from "../lib/riskColor";
 
 /**
- * Leaflet setup ported from PROTOTYPE/dima-hasao-map.html nearly as-is per
- * CLAUDE.md: same tile-fallback chain (OSM -> Esri -> a plain list when
- * both fail), same theme-aware styling approach. What's different: zone
- * polygons come from real backend GeoJSON (zones.geom via GET /zones), not
- * the prototype's synthetic deterministic-heptagon approximation, and
- * colour is docs/DESIGN-SYSTEM.md §2.3's risk-severity scale (--sev1..5)
- * rather than a hardcoded per-zone `tier` field.
+ * Leaflet setup ported from PROTOTYPE/dima-hasao-map.html per CLAUDE.md,
+ * with two changes from the prototype's own OSM -> Esri chain, both forced
+ * by the same failure mode: a "free" tile provider quietly starting to
+ * require an API key and baking an "API KEY REQUIRED" watermark into the
+ * tile image itself, rather than failing the request — a load Leaflet's
+ * own error/tileerror events can't detect (the request succeeds; it's just
+ * visually broken), so no amount of retry logic recovers from it, and it
+ * only shows up by actually loading the tile and looking at it. Esri's
+ * "Canvas" World_Light/Dark_Gray_Base services (the prototype's original
+ * fallback) hit this first; CartoDB's basemaps.cartocdn.com — brought in
+ * specifically to replace Esri for the same reason — hit it too, some time
+ * after that fix shipped (confirmed live again). Rather than chase a third
+ * "free real dark tiles" provider that can pull the same move, the fallback
+ * tier is now a second, independently-run OSM mirror (the standard
+ * tile.openstreetmap.org, distinct infrastructure from the .fr mirror
+ * that's tier one) — always-light tiles like tier one, inverted for dark
+ * theme by the same CSS filter both tiers now share unconditionally.
  */
 
+type TileKind = "osm" | "osm2";
+
 const OSM_URL = "https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png";
-const esriUrl = (theme: Theme) =>
-  theme === "light"
-    ? "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-    : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+const OSM2_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+const NEXT_TILE_KIND: Record<TileKind, TileKind | null> = { osm: "osm2", osm2: null };
+const TILE_TIMEOUT_MS = 3500;
 
 function toLatLngs(geom: Zone["geom"]): L.LatLngExpression[] {
   // GeoJSON is [lon, lat]; Leaflet wants [lat, lon]. Only the outer ring —
@@ -31,14 +43,19 @@ interface ZoneMapProps {
   zones: Zone[];
   theme?: Theme;
   onSelectZone?: (zoneId: string) => void;
+  /** Shown alongside the "basemap unavailable" fallback when there are no
+   * zones to list either (e.g. the public landing page's hero preview,
+   * which never receives real zone data pre-auth). */
+  emptyFallbackNote?: string;
 }
 
-export default function ZoneMap({ zones, theme = "dark", onSelectZone }: ZoneMapProps) {
+export default function ZoneMap({ zones, theme = "dark", onSelectZone, emptyFallbackNote }: ZoneMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const zoneLayersRef = useRef<L.Polygon[]>([]);
   const [fallback, setFallback] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -48,22 +65,31 @@ export default function ZoneMap({ zones, theme = "dark", onSelectZone }: ZoneMap
 
     // React 18 StrictMode mounts, cleans up, and remounts every effect once
     // in dev — map.remove() runs between the two. Without this guard, the
-    // first mount's 5s fallback timer fires after that cleanup and calls
+    // first mount's fallback timer fires after that cleanup and calls
     // .addTo(map) on an already-torn-down Leaflet map (whose container was
     // ripped out from under it), crashing on a null appendChild. Caught by
     // actually loading the page, not by the type-checker or the test suite.
     let live = true;
     let tileErrorCount = 0;
     let tileLoadCount = 0;
-    let escalated = false;
 
-    const setTileLayer = (kind: "osm" | "esri") => {
+    const TILE_URL: Record<TileKind, string> = { osm: OSM_URL, osm2: OSM2_URL };
+
+    const setTileLayer = (kind: TileKind) => {
       if (!live) return;
       if (tileLayerRef.current) map.removeLayer(tileLayerRef.current);
-      const layer =
-        kind === "osm"
-          ? L.tileLayer(OSM_URL, { attribution: "© OpenStreetMap contributors", maxZoom: 18, subdomains: "abc" })
-          : L.tileLayer(esriUrl(theme), { attribution: "Tiles © Esri", maxZoom: 16 });
+      // Both tiers are always-light OSM tiles — tokens.css unconditionally
+      // inverts .leaflet-tile-pane for dark theme (PROTOTYPE/
+      // dima-hasao-map.html's own body[data-theme="dark"]
+      // .leaflet-tile-pane{filter:invert(1)...} trick, scoped per-map-
+      // instance instead of globally), so no data-tile-kind branching is
+      // needed here any more — CSS handles both tiers identically, and a
+      // theme toggle never has to touch this Leaflet instance at all.
+      const layer = L.tileLayer(TILE_URL[kind], {
+        attribution: "© OpenStreetMap contributors",
+        maxZoom: 18,
+        subdomains: "abc",
+      });
       layer.addTo(map);
       tileLayerRef.current = layer;
 
@@ -71,6 +97,7 @@ export default function ZoneMap({ zones, theme = "dark", onSelectZone }: ZoneMap
       tileErrorCount = 0;
       layer.on("load", () => {
         tileLoadCount++;
+        setLoaded(true);
       });
       layer.on("tileerror", () => {
         tileErrorCount++;
@@ -78,15 +105,15 @@ export default function ZoneMap({ zones, theme = "dark", onSelectZone }: ZoneMap
       });
       setTimeout(() => {
         if (live && tileLoadCount === 0) escalate(kind);
-      }, 5000);
+      }, TILE_TIMEOUT_MS);
     };
 
-    const escalate = (fromKind: "osm" | "esri") => {
-      if (!live || escalated) return;
-      if (fromKind === "osm") {
-        setTileLayer("esri");
+    const escalate = (fromKind: TileKind) => {
+      if (!live) return;
+      const next = NEXT_TILE_KIND[fromKind];
+      if (next) {
+        setTileLayer(next);
       } else {
-        escalated = true;
         setFallback(true);
       }
     };
@@ -99,8 +126,11 @@ export default function ZoneMap({ zones, theme = "dark", onSelectZone }: ZoneMap
       mapRef.current = null;
       tileLayerRef.current = null;
     };
+    // Tile URLs no longer depend on theme (see the comment above) — the map
+    // is created once on mount and never torn down/rebuilt on a theme
+    // toggle; CSS alone handles the dark-mode look.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -141,6 +171,10 @@ export default function ZoneMap({ zones, theme = "dark", onSelectZone }: ZoneMap
     if (zones.length > 0) {
       const bounds = L.latLngBounds(zones.flatMap((z) => toLatLngs(z.geom)));
       map.fitBounds(bounds.pad(0.2));
+    } else {
+      // Dima Hasao district centre (Haflong) — real coordinates, matching
+      // the seeded zones' own centroids, not a generic India view.
+      map.setView([25.17, 93.02], 10);
     }
   }, [zones, theme, fallback, onSelectZone]);
 
@@ -148,14 +182,32 @@ export default function ZoneMap({ zones, theme = "dark", onSelectZone }: ZoneMap
     return (
       <div style={{ padding: 16 }}>
         <p style={{ fontSize: 11, opacity: 0.7 }}>Basemap unavailable — zone data shown as list.</p>
-        <ZoneListFallback zones={zones} theme={theme} />
+        {zones.length > 0 ? <ZoneListFallback zones={zones} theme={theme} /> : emptyFallbackNote && <p style={{ fontSize: 11, color: "var(--ink4)" }}>{emptyFallbackNote}</p>}
       </div>
     );
   }
 
   return (
     <div style={{ position: "relative", height: "100%", minHeight: 420 }}>
-      <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+      <div ref={containerRef} style={{ position: "absolute", inset: 0, background: "var(--bg2)" }} />
+      {!loaded && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 400,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "none",
+            background: "var(--bg2)",
+          }}
+        >
+          <span style={{ fontFamily: "var(--font-data)", fontSize: 11, color: "var(--ink4)", letterSpacing: "0.06em" }}>
+            LOADING BASEMAP…
+          </span>
+        </div>
+      )}
       <SampleDataBadge />
     </div>
   );
@@ -163,15 +215,15 @@ export default function ZoneMap({ zones, theme = "dark", onSelectZone }: ZoneMap
 
 function ZoneListFallback({ zones, theme }: { zones: Zone[]; theme: Theme }) {
   return (
-    <div style={{ border: "1px solid #1d2a45", borderRadius: 6, overflow: "hidden" }}>
+    <div style={{ border: "1px solid var(--border)", borderRadius: 6, overflow: "hidden" }}>
       {zones.map((z) => (
         <div
           key={z.zone_id}
-          style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 14px", borderBottom: "1px solid #1d2a45" }}
+          style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 14px", borderBottom: "1px solid var(--border-soft)" }}
         >
           <span style={{ width: 10, height: 10, borderRadius: 2, background: riskColor(z.risk_score_72h, theme) }} />
-          <span style={{ width: 64, fontFamily: "monospace", fontSize: 11 }}>{z.display_code}</span>
-          <span style={{ flex: 1 }}>{z.name}</span>
+          <span style={{ width: 64, fontFamily: "var(--font-data)", fontSize: 11 }}>{z.display_code}</span>
+          <span style={{ flex: 1, fontFamily: "var(--font-interface)" }}>{z.name}</span>
           <span style={{ fontSize: 11, opacity: 0.7 }}>{z.hazard_types.join(", ")}</span>
         </div>
       ))}
@@ -179,25 +231,32 @@ function ZoneListFallback({ zones, theme }: { zones: Zone[]; theme: Theme }) {
   );
 }
 
-// rule 6 — sample/seeded data is never shown without this marker.
+// PROTOTYPE/PS191 Platform.dc.html line 97's hero-map caption chip — a
+// pulsing live-dot + mono label, not a filled red pill (rule 6 — sample/
+// seeded data is never shown without this marker).
 function SampleDataBadge() {
   return (
     <div
       style={{
         position: "absolute",
-        left: 10,
-        bottom: 10,
+        left: 12,
+        bottom: 12,
         zIndex: 500,
-        fontFamily: "monospace",
-        fontSize: 10,
-        letterSpacing: "0.04em",
-        padding: "4px 8px",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "5px 8px",
         borderRadius: 3,
-        background: "rgba(184,12,9,0.85)",
-        color: "#fff",
+        background: "var(--panel)",
+        border: "1px solid var(--border2)",
+        fontFamily: "var(--font-data)",
+        fontWeight: 500,
+        fontSize: 10,
+        color: "var(--ink3)",
       }}
     >
-      SAMPLE DATA
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--sev5)", animation: "pulseDot 2s ease-in-out infinite" }} />
+      LIVE HAZARD ZONING · SAMPLE DATA
     </div>
   );
 }

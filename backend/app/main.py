@@ -5,6 +5,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from .auth.router import router as auth_router
 from .routers.change_detection import router as change_detection_router
 from .routers.dashboard import router as dashboard_router
+from .routers.demo import router as demo_router
 from .routers.escorts import router as escorts_router
 from .routers.forecasts import router as forecasts_router
 from .routers.handoffs import router as handoffs_router
@@ -53,6 +54,7 @@ app.include_router(forecasts_router)
 app.include_router(change_detection_router)
 app.include_router(handoffs_router)
 app.include_router(incident_outcomes_router)
+app.include_router(demo_router)
 
 
 @app.get("/health")

@@ -1,6 +1,7 @@
 import uuid
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_scoped_db, require_role
@@ -29,6 +30,20 @@ def run_change_detection(
     if detection is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="zone not found")
     return detection
+
+
+@router.get("/{zone_id}/change-detections/image/{which}")
+def get_zone_change_detection_image(zone_id: uuid.UUID, which: Literal["before", "after"], db: Session = Depends(get_scoped_db)):
+    """Serves the actual curated before/after PNG bytes (rule 6: the real
+    synthetic pair app/cv/change_detection.py generates, not a stock
+    photo) — RLS-scoped the same way the rest of change-detection is."""
+    try:
+        image = change_detection_service.get_zone_image(db, zone_id, which)
+    except ChangeDetectionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if image is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="zone or imagery not found")
+    return Response(content=image, media_type="image/png")
 
 
 @router.get("/{zone_id}/change-detections", response_model=ChangeDetectionListResponse)

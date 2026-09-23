@@ -74,7 +74,7 @@ function Login({ onLoggedIn }: { onLoggedIn: (token: string, user: CurrentUser) 
     <main style={page}>
       <form onSubmit={submit} style={card}>
         <h1 style={{ fontSize: 15, margin: 0 }}>PS191 Field Survey</h1>
-        <p style={{ fontSize: 12, color: "#8d9cb8", margin: 0 }}>Sign in once — the capture form works offline after that.</p>
+        <p style={{ fontSize: 12, color: "var(--ink3)", margin: 0 }}>Sign in once — the capture form works offline after that.</p>
         <input placeholder="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} style={input} />
         <input
           placeholder="Password"
@@ -84,7 +84,7 @@ function Login({ onLoggedIn }: { onLoggedIn: (token: string, user: CurrentUser) 
           onChange={(e) => setPassword(e.target.value)}
           style={input}
         />
-        {error && <p style={{ color: "#b80c09", fontSize: 12, margin: 0 }}>{error}</p>}
+        {error && <p style={{ color: "var(--sev1)", fontSize: 12, margin: 0 }}>{error}</p>}
         <button type="submit" disabled={submitting} style={button}>
           {submitting ? "Signing in…" : "Sign in"}
         </button>
@@ -229,7 +229,7 @@ function SurveyApp({ token, user }: { token: string; user: CurrentUser }) {
       <div style={{ ...card, width: 380 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <h1 style={{ fontSize: 15, margin: 0 }}>PS191 Field Survey</h1>
-          <span style={{ fontSize: 11, color: "#8d9cb8" }}>{user.full_name}</span>
+          <span style={{ fontSize: 11, color: "var(--ink3)" }}>{user.full_name}</span>
         </div>
 
         <form onSubmit={saveOffline} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -269,7 +269,7 @@ function SurveyApp({ token, user }: { token: string; user: CurrentUser }) {
                 Lon
                 <input value={geotag.lon} onChange={(e) => setGeotag({ ...geotag, lon: e.target.value })} style={input} />
               </label>
-              <button type="button" onClick={useGpsLocation} style={{ ...button, background: "#111b31", color: "#c6d2e8", flex: "none" }}>
+              <button type="button" onClick={useGpsLocation} style={{ ...button, background: "var(--track)", color: "var(--ink2)", flex: "none" }}>
                 Use GPS
               </button>
             </div>
@@ -309,19 +309,19 @@ function SurveyApp({ token, user }: { token: string; user: CurrentUser }) {
           </button>
         </form>
 
-        <div style={{ borderTop: "1px solid #1d2a45", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 12, color: "#8d9cb8" }}>
+            <span style={{ fontSize: 12, color: "var(--ink3)" }}>
               {pendingCount} queued · {(queue?.length ?? 0) - pendingCount} synced
             </span>
             <button onClick={syncNow} disabled={syncing || pendingCount === 0} style={{ ...button, width: "auto", padding: "6px 12px" }}>
               {syncing ? "Syncing…" : "Sync now"}
             </button>
           </div>
-          {syncMessage && <p style={{ fontSize: 11, color: "#8d9cb8", margin: 0 }}>{syncMessage}</p>}
+          {syncMessage && <p style={{ fontSize: 11, color: "var(--ink3)", margin: 0 }}>{syncMessage}</p>}
           <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 160, overflow: "auto" }}>
             {(queue ?? []).map((s) => (
-              <div key={s.survey_id} style={{ fontSize: 11, display: "flex", justifyContent: "space-between", color: s.sync_error ? "#b80c09" : "#c6d2e8" }}>
+              <div key={s.survey_id} style={{ fontSize: 11, display: "flex", justifyContent: "space-between", color: s.sync_error ? "var(--sev1)" : "var(--ink2)" }}>
                 <span>{new Date(s.submitted_at).toLocaleTimeString()}</span>
                 <span>{s.sync_error ? "error" : s.synced ? "synced" : "pending"}</span>
               </div>
@@ -344,16 +344,16 @@ function NumberField({ label: text, value, onChange }: { label: string; value: s
 
 const page: CSSProperties = {
   minHeight: "100vh",
-  background: "#070b16",
-  color: "#e9eef8",
-  fontFamily: "'Schibsted Grotesk', system-ui, sans-serif",
+  background: "var(--bg)",
+  color: "var(--ink)",
+  fontFamily: "var(--font-interface)",
   display: "flex",
   justifyContent: "center",
   padding: "24px 12px",
 };
 const card: CSSProperties = {
-  background: "#0d1426",
-  border: "1px solid #1d2a45",
+  background: "var(--panel)",
+  border: "1px solid var(--border)",
   borderRadius: 8,
   padding: 20,
   display: "flex",
@@ -362,6 +362,24 @@ const card: CSSProperties = {
   width: 320,
   height: "fit-content",
 };
-const label: CSSProperties = { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#8d9cb8" };
-const input: CSSProperties = { background: "#0f1730", border: "1px solid #1d2a45", borderRadius: 4, padding: "8px 10px", color: "#e9eef8", fontSize: 13 };
-const button: CSSProperties = { background: "#fd9e02", color: "#070b16", border: "none", borderRadius: 4, padding: "9px 0", fontWeight: 600, fontSize: 13, cursor: "pointer" };
+const label: CSSProperties = { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "var(--ink3)" };
+const input: CSSProperties = {
+  background: "var(--panel2)",
+  border: "1px solid var(--border)",
+  borderRadius: 5,
+  padding: "8px 10px",
+  color: "var(--ink)",
+  fontSize: 13,
+  fontFamily: "var(--font-data)",
+};
+const button: CSSProperties = {
+  background: "var(--sev3)",
+  color: "var(--bg)",
+  border: "none",
+  borderRadius: 5,
+  padding: "9px 0",
+  fontWeight: 600,
+  fontSize: 13,
+  cursor: "pointer",
+  fontFamily: "var(--font-interface)",
+};

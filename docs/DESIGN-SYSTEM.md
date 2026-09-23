@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Purpose** | Colour, typography and interface principles for every screen in the platform |
-| **Status** | v2 — reconciled with the built prototype (`PS191_Platform.dc.html`). Tokens below are the ones actually shipping. |
+| **Status** | v3 — reverted to the full-saturation palette and three-face type system (see §1/§2.5's revision note). Tokens below are the ones actually shipping. |
 | **Relates to** | PRD §7 (screen inventory), PRD §10 (explainability, data currency, privacy), TRD, Backend Schema |
 
 ---
@@ -18,7 +18,7 @@ The platform is an authority-only decision and coordination layer, used by SDMA 
 
 This rules out several defaults. No consumer-app friendliness, no illustration, no decorative gradients, no layouts where every block is an identical rounded card. Structural devices — numbering, dividers, severity stripes — encode something true about the content rather than decorate it.
 
-**A note on this version.** An earlier draft of this document proposed a maximum-saturation palette (`#00043a` ground, `#ff002b`, `#00ff80`) and a three-face type system. The prototype was built on a different, contrast-validated palette, and that palette is now canonical. The reasoning is in §2.5 — it isn't a drift from the design intent, it delivers the design intent more reliably.
+**A note on this version.** v1 of this document proposed a maximum-saturation palette (`#00043a` ground, `#ff002b`, `#00ff80`) and a three-face type system. v2 replaced it with a different, contrast-validated palette, on the reasoning that full saturation spends the danger signal everywhere at once (the argument is kept, historically, in §2.5). v3 — this version — reverts to the v1 palette and type system by explicit product decision: the team wants Deep Navy ground, Imperial Blue surfaces and Racing Red at the critical end of the risk ramp, at full saturation, and accepted the contrast trade-off that entails. Anyone extending this system should treat the tokens in §2/§3 below as canonical and re-run the contrast check in §2.5 against them before shipping a new colour.
 
 ---
 
@@ -30,23 +30,25 @@ Colour is expressed as CSS custom properties with a full light-theme override. N
 
 | Token | Dark | Light | Role |
 |---|---|---|---|
-| `--bg` | `#070b16` | `#F4F6F9` | Base background |
-| `--bg2` | `#0a1020` | `#FFFFFF` | Nav rail, header, raised ground |
-| `--panel` | `#0d1426` | `#FFFFFF` | Panels and cards |
-| `--panel2` | `#0f1730` | `#F4F6F9` | Nested panels |
-| `--track` | `#111b31` | `#E7EBF1` | Progress tracks, inert fills |
-| `--rowSel` | `#101c38` | `#E8EFFB` | Selected table row |
-| `--border` / `--border2` / `--borderSoft` | `#1d2a45` / `#2a3b5e` / `#141e35` | `#DDE3EC` / `#C3CDDC` / `#EDF0F5` | Dividers, panel edges, hairlines |
+| `--bg` | `#00043a` (Deep Navy) | `#F4F6F9` | Base background |
+| `--bg2` | `#002962` (Imperial Blue) | `#FFFFFF` | Nav rail, header, raised ground |
+| `--panel` | `#001d4d` | `#FFFFFF` | Panels and cards |
+| `--panel2` | `#002e70` | `#F4F6F9` | Nested panels |
+| `--track` | `#001233` | `#E7EBF1` | Progress tracks, inert fills |
+| `--rowSel` | `#003a82` | `#E8EFFB` | Selected table row |
+| `--border` / `--border2` / `--borderSoft` | `#1c3f7a` / `#3868a8` / `#0a1f52` | `#DDE3EC` / `#C3CDDC` / `#EDF0F5` | Dividers, panel edges, hairlines |
+
+Deep Navy and Imperial Blue are the two named brand anchors; `--panel`/`--panel2`/`--track`/`--rowSel` are a consistent lightness ramp built off them, not independently chosen, so panel nesting still reads as depth rather than as arbitrary variation. The light-theme column here is carried forward unchanged from v2 and remains unwired (§6).
 
 ### 2.2 Ink
 
 | Token | Dark | Light | Role |
 |---|---|---|---|
-| `--ink` | `#e9eef8` | `#0F1620` | Primary text |
-| `--ink2` | `#c6d2e8` | `#27313F` | Secondary text, control labels |
-| `--ink3` | `#8d9cb8` | `#4C596C` | Descriptive copy |
-| `--ink4` | `#7c8db0` | `#5C6878` | Captions, column headers, metadata |
-| `--ink5` | `#5b6b8c` | `#6B7787` | Disabled and dormant states |
+| `--ink` | `#eef1fb` | `#0F1620` | Primary text |
+| `--ink2` | `#c9d3ee` | `#27313F` | Secondary text, control labels |
+| `--ink3` | `#8fa0cc` | `#4C596C` | Descriptive copy |
+| `--ink4` | `#7c8fc0` | `#5C6878` | Captions, column headers, metadata |
+| `--ink5` | `#5870a8` | `#6B7787` | Disabled and dormant states |
 
 ### 2.3 Risk semantics
 
@@ -54,11 +56,11 @@ These carry meaning and are never used decoratively.
 
 | Token | Dark | Light | Role |
 |---|---|---|---|
-| `--sev1` | `#B80C09` | `#D32E22` | Immediate tier, risk ≥ 80 |
-| `--sev2` | `#DB222A` | `#D32E22` | Active alert, blocked route, risk 65–79 |
-| `--sev3` | `#FD9E02` | `#D98F1F` | Short-term tier, watch state, risk 45–64 |
-| `--sev4` | `#8FC93A` | `#C9A93A` | Medium-term tier, risk 28–44 |
-| `--sev5` | `#32E875` | `#2E8A7D` | Verified, all-clear, live status, risk < 28 |
+| `--sev1` | `#ff002b` (Racing Red) | `#D32E22` | Immediate tier, risk ≥ 80 |
+| `--sev2` | `#ff5a1f` | `#D32E22` | Active alert, blocked route, risk 65–79 |
+| `--sev3` | `#ffb300` | `#D98F1F` | Short-term tier, watch state, risk 45–64 |
+| `--sev4` | `#a3e635` | `#C9A93A` | Medium-term tier, risk 28–44 |
+| `--sev5` | `#00ff80` | `#2E8A7D` | Verified, all-clear, live status, risk < 28 |
 
 Each severity step also carries a matched **ink** and **surface** pair (`--sev2Ink`, `--t1Bg`/`--t1Border`, `--okBg`/`--okBorder`) so a tier can be rendered as a filled chip without a per-screen contrast decision.
 
@@ -67,9 +69,11 @@ Each severity step also carries a matched **ink** and **surface** pair (`--sev2I
 | Token | Dark | Light | Role |
 |---|---|---|---|
 | `--accent` | `#06BEE1` | `#2F6FE0` | Selection, focus, primary action, computed-score emphasis |
-| `--brandDeep` | `#03256C` | `#2F6FE0` | Product mark |
+| `--brandDeep` | `#002962` (Imperial Blue) | `#2F6FE0` | Product mark |
 | `--blue` | `#2541B2` | `#2F6FE0` | Informational state (in-progress, pending approval) |
 | `--ocean` | `#1768AC` | `#2F6FE0` | Non-semantic data bars (factor contributions, occupancy) |
+
+`--accent` deliberately stays a cool cyan rather than following the ground/risk colours into full saturation — selection and focus still need to read as distinct from danger, per §2.5's remaining argument on that one point.
 
 Hazard-type colours are categorical, not severity — a flood zone is not "worse" than a landslide zone:
 
@@ -80,13 +84,13 @@ Hazard-type colours are categorical, not severity — a flood zone is not "worse
 | `--hzBurst` | `#A996E8` | `#6A4FB0` | Cloudburst / extreme rainfall |
 | `--hzCoast` | `#6FCFC7` | `#268888` | Coastal erosion |
 
-### 2.5 Why this palette rather than a full-saturation ramp
+### 2.5 On full saturation, and the trade-off it carries
 
-The stated goal — *"restrained colour so that when red appears it genuinely means danger"* — is the reason the palette is not built at maximum saturation. At full chroma, `#ff002b`, `#ff8800` and `#00ff80` compete for attention equally, so nothing reads as more urgent than anything else and the danger signal is spent everywhere at once. The shipping ramp varies **lightness** as well as hue across `--sev1`→`--sev5`, so severity is legible as a progression rather than as five equally loud signals.
+v2 of this document argued against a full-saturation ramp: at full chroma, `#ff002b`, `#ff5a1f`/`#ff8800` and `#00ff80` compete for attention equally, so nothing reads as more urgent than anything else and the danger signal risks being spent everywhere at once. That argument still holds as a general design principle, and the reasoning is kept here rather than deleted, because it is exactly what the next person adding a colour to this ramp needs to weigh.
 
-Keeping the primary accent cool (`--accent`) rather than red is the other half of this: selection, focus and computed-score emphasis never borrow the danger colour, so red stays reserved for risk.
+v3 reverts to full saturation anyway, by explicit product decision (§1). The mitigation is that `--sev1`→`--sev5` still varies **lightness and hue** together, not just chroma — Racing Red, then a red-orange, then amber, then lime, then bright green — so the progression is still legible as a sequence even at maximum saturation; it's a louder version of the same ramp shape, not five unrelated warning colours. `--accent` staying a cool cyan (§2.4) rather than joining the red end is what still keeps selection/focus distinguishable from danger under this louder palette.
 
-The palette is also validated rather than asserted. The prototype computes WCAG contrast at render time (`contrast()`, `textInk()`, `safeFill()`) and lightens or darkens any severity fill until its label clears **4.8:1** against the panel behind it. Any new colour added to this system must survive the same check.
+The WCAG contrast validation this section previously described (`contrast()`, `textInk()`, `safeFill()` computing a 4.8:1 minimum at render time) was a property of the v2 palette's design, not of this codebase — it has not been re-run against the v3 tokens above. Whoever next touches this ramp should treat that validation as owed, not already done: full-saturation fills are more likely to fail a contrast check against light text than the muted v2 ramp was, particularly `--sev4`/`--sev5` against `--ink`.
 
 ### 2.6 Colour-blind-safe variant
 
@@ -104,14 +108,17 @@ An alternate tier palette (Okabe-Ito derived) is available as an appearance sett
 
 ## 3. Typography
 
-Two faces, not three. The earlier draft proposed a separate display face and a serif body face; the build merged display and body into one grotesque, which holds up better at the interface's actual density — most "body" copy here is a caption or a one-line rationale, not running prose.
+Three faces. v2 merged display and body into one grotesque on the reasoning that most "body" copy here is a caption or a one-line rationale, not running prose. v3 reverts to the originally-proposed three-face system: a condensed display face for headings, a serif for body copy, and mono for data — reinstated by the same product decision that reinstated the v1 palette (§1).
 
 | Role | Face | Weights | Use |
 |---|---|---|---|
-| Interface | Schibsted Grotesk | 400 / 500 / 600 | Screen titles, panel headings, labels, buttons, descriptive copy |
+| Heading | Big Shoulders Display | 400 / 600 / 700 | Screen titles, panel headings, nav labels, primary buttons |
+| Body | Newsreader | 400 / 500 / 600 | Descriptive copy, rationale text, form labels, table prose values |
 | Data | IBM Plex Mono | 400 / 500 / 600 | Zone and household IDs, risk scores, coordinates, timestamps, table values, status chips, column headers |
 
-The mono face is not stylistic. It is what makes a dense table of risk scores, populations and timestamps scannable, and it signals which values came from the system rather than from prose. The division is strict: **if a value was computed or recorded by the system, it is set in mono.** Prose about that value is set in the grotesque.
+The mono face is not stylistic. It is what makes a dense table of risk scores, populations and timestamps scannable, and it signals which values came from the system rather than from prose. The division is strict: **if a value was computed or recorded by the system, it is set in mono.** Everything else is heading or body depending on whether it titles a screen/panel or describes one.
+
+Newsreader is a text serif, not a display face — legible at body sizes but not intended for the small, dense UI chrome (badges, table column headers, compact status text) this interface is mostly made of. Where a screen has genuine running prose (a rationale paragraph, a note field, a caption), it should read in Newsreader; short interface labels inherit it as the default body face by cascade, which is an acceptable trade-off for the three-face system's sake, not a claim that Newsreader is the ideal face for a 10px badge.
 
 Uppercase with wide tracking (`letter-spacing: .06em`–`.14em`) marks the system's own vocabulary — `IMMEDIATE`, `FIELD-VERIFIED`, `SAMPLE DATA`, `READ-ONLY SESSION`, section labels in the nav rail. It is never used for sentences.
 

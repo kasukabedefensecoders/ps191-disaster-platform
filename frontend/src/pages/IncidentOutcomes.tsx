@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { OutcomeBadge, RiskChip, SampleDataBadge } from "../components/badges";
 import { createIncidentOutcome, fetchIncidentOutcomes, fetchZones, type IncidentOutcome, type Zone } from "../lib/api";
@@ -16,8 +17,10 @@ function nowForInput(): string {
 
 export default function IncidentOutcomes() {
   const { token, user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const preselectedZoneId = searchParams.get("zone");
   const [zones, setZones] = useState<Zone[] | null>(null);
-  const [zoneId, setZoneId] = useState<string | null>(null);
+  const [zoneId, setZoneId] = useState<string | null>(preselectedZoneId);
   const [outcomes, setOutcomes] = useState<IncidentOutcome[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -83,7 +86,7 @@ export default function IncidentOutcomes() {
   return (
     <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16, maxWidth: 720 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ fontSize: 14, margin: 0 }}>Post-incident feedback</h2>
+        <h2 style={{ fontSize: 18 }}>Post-incident feedback</h2>
         <SampleDataBadge />
       </div>
       <p style={{ fontSize: 12, color: "var(--ink3)", margin: 0 }}>
@@ -158,6 +161,7 @@ export default function IncidentOutcomes() {
             <button
               onClick={submit}
               disabled={submitting || !zoneId}
+              className="ps-btn-confirm"
               style={{
                 background: "var(--sev5)",
                 border: "none",

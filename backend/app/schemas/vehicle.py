@@ -7,6 +7,8 @@ from pydantic import BaseModel
 class VehicleOut(BaseModel):
     vehicle_id: uuid.UUID
     district_id: uuid.UUID
+    display_code: str | None
+    route_label: str | None
     vehicle_type: str
     capacity: int
     status: str

@@ -14,6 +14,9 @@ class ShelterOut(BaseModel):
     current_occupancy: int
     facilities: dict
     status: str
+    contact_name: str | None
+    contact_phone: str | None
+    needs: list[str]
     last_updated_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -36,6 +39,9 @@ class ShelterCreate(BaseModel):
     current_occupancy: int = 0
     facilities: dict = {}
     status: str = "active"
+    contact_name: str | None = None
+    contact_phone: str | None = None
+    needs: list[str] = []
 
 
 class ShelterUpdate(BaseModel):
@@ -45,6 +51,21 @@ class ShelterUpdate(BaseModel):
     current_occupancy: int | None = None
     facilities: dict | None = None
     status: str | None = None
+    contact_name: str | None = None
+    contact_phone: str | None = None
+    needs: list[str] | None = None
+
+
+class ShelterLoginRequest(BaseModel):
+    shelter_code: str
+
+
+class ShelterAccessToken(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    shelter_id: uuid.UUID
+    display_code: str | None
+    name: str
 
 
 class ShelterMatchOut(ShelterOut):

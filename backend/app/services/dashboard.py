@@ -23,7 +23,7 @@ def build_dashboard_summary(db: Session, since: datetime | None) -> DashboardSum
     zone_items, zone_total = zones_service.list_zones(db, since=since, limit=PAGE_LIMIT, offset=0)
     shelter_items, shelter_total = shelters_service.list_shelters(db, since=since, limit=PAGE_LIMIT, offset=0)
     route_items, route_total = routes_service.list_routes(db, limit=PAGE_LIMIT, offset=0)
-    relocation_items, relocation_total = relocations_service.list_relocations(db, limit=PAGE_LIMIT, offset=0)
+    relocation_items, relocation_total = relocations_service.list_relocations(db, since=since, limit=PAGE_LIMIT, offset=0)
     handoff_items, handoff_total = handoffs_service.list_handoffs(db, since=since, limit=PAGE_LIMIT, offset=0)
 
     # Top priority households: computed fresh across every zone this caller

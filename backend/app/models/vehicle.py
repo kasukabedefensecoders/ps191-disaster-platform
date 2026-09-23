@@ -15,6 +15,8 @@ class Vehicle(Base):
 
     vehicle_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     district_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("districts.district_id"), nullable=False)
+    display_code: Mapped[str | None] = mapped_column(Text, nullable=True, unique=True)
+    route_label: Mapped[str | None] = mapped_column(Text, nullable=True)
     vehicle_type: Mapped[str] = mapped_column(Text, nullable=False)
     capacity: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(VEHICLE_STATUS, nullable=False, server_default="available")
