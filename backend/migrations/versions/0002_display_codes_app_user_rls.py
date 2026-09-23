@@ -54,7 +54,15 @@ def upgrade() -> None:
         $$;
         """
     )
-    op.execute(f"grant connect on database ps191 to {settings.app_db_user}")
+    op.execute(
+        f"""
+        do $$
+        begin
+          execute format('grant connect on database %I to %I', current_database(), '{settings.app_db_user}');
+        end
+        $$;
+        """
+    )
     op.execute(f"grant usage on schema public to {settings.app_db_user}")
     op.execute(f"grant select, insert, update on all tables in schema public to {settings.app_db_user}")
     op.execute(f"revoke update, delete on audit_log from {settings.app_db_user}")
@@ -103,7 +111,15 @@ def downgrade() -> None:
 
     op.execute(f"revoke all on all tables in schema public from {settings.app_db_user}")
     op.execute(f"revoke usage on schema public from {settings.app_db_user}")
-    op.execute(f"revoke connect on database ps191 from {settings.app_db_user}")
+    op.execute(
+        f"""
+        do $$
+        begin
+          execute format('revoke connect on database %I from %I', current_database(), '{settings.app_db_user}');
+        end
+        $$;
+        """
+    )
     op.execute(f"drop role if exists {settings.app_db_user}")
 
     for table, _pk in DISPLAY_CODE_TABLES:
