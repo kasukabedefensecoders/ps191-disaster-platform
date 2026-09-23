@@ -36,7 +36,11 @@ _dev_origins = [
     "http://localhost:5174",  # frontend-field (Phase 9) dev server
     "http://127.0.0.1:5174",
 ]
-_prod_origins = [origin.strip() for origin in settings.cors_allowed_origins.split(",") if origin.strip()]
+_prod_origins = [
+    origin.strip().rstrip("/")
+    for origin in settings.cors_allowed_origins.split(",")
+    if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,

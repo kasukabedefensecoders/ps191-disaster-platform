@@ -1,4 +1,17 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
+
+
+def _use_psycopg_driver(url: str) -> str:
+    """Managed Postgres providers (Railway, Heroku, ...) hand out plain
+    postgresql:// or postgres:// URLs. SQLAlchemy then defaults to psycopg2,
+    which isn't installed (only psycopg[binary] is, per requirements.txt) —
+    force the psycopg3 driver regardless of what scheme we're handed."""
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    return url
 
 
 class Settings(BaseSettings):
@@ -15,6 +28,11 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_minutes: int = 60 * 24 * 7
     cors_allowed_origins: str = ""
+
+    @field_validator("database_url", "migration_database_url")
+    @classmethod
+    def _normalize_db_url(cls, v: str) -> str:
+        return _use_psycopg_driver(v)
 
     class Config:
         env_file = ".env"
