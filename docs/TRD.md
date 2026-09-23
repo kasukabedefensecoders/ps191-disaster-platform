@@ -45,7 +45,7 @@
 
 13. Assumptions, Constraints & Risks (Technical)
 
-14. Open Technical Decisions for the Team
+14. Resolved Technical Decisions
 
 15. Related Documents
 
@@ -78,7 +78,7 @@ A set of scheduled connectors, one per source, each with its own polling cadence
 
 **Application/service layer.**
 
-Ten independently deployable FastAPI services, each owning one PRD functional requirement or a closely related pair (mapped in full in §7). Services communicate over internal REST calls for the hackathon build; the API boundaries are drawn so any service could later move behind a message queue without a contract change.
+One FastAPI app, one process, with a router per PRD functional requirement or closely related pair (mapped in full in §7 — 14 routers as of the current build: zones, households, shelters, vehicles, escorts, relocations, routes, dashboard, surveys, forecasts, change_detection, handoffs, incident_outcomes, demo, plus auth). This is the resolved form of decision 1 in §14 below — drawn so a router could later move behind its own service without an API contract change, but nothing is split into separate services today; there is no inter-service REST traffic to speak of.
 
 **Data layer.**
 
@@ -136,6 +136,8 @@ PostGIS is used for every table with a spatial dimension. Below are the core ent
 | users | user_id, role, district_id, auth fields | RBAC per PRD §10 |
 
 Every scoring/ranking table (zones.susceptibility_score, households.vulnerability_score, risk_forecasts.factors) stores its factor breakdown alongside the number, not just the final value — this is what makes the explainability requirement (PRD §10) a data-model guarantee rather than a UI promise.
+
+Five more tables were added at the schema layer once column-level design started — `districts`, `vehicles`, `escorts`, `user_zone_assignments`, and `incident_outcomes` — each called out and justified individually in Backend Schema §1; this list stays the fixed entity-level shape referenced above, not a mirror of every table.
 
 ## 6. External API Integration
 
@@ -241,11 +243,11 @@ Per PRD §10, household-level vulnerability data is sensitive and access must be
 
 **Hackathon demo:**
 
-Docker Compose on a single host — frontend, the backend services (or a consolidated FastAPI app with routers, if splitting into ten containers is more overhead than the timeline allows), Postgres+PostGIS, Redis, MinIO, and a self-hosted OSRM instance pre-built for the Dima Hasao road network extract.
+Docker Compose on a single host — the frontend, one consolidated FastAPI app with routers (§3, §14 decision 1), Postgres+PostGIS, Redis, MinIO, and a self-hosted OSRM instance pre-built for the Dima Hasao road network extract.
 
 **Designed for, not built — production:**
 
-containers on Kubernetes (or the equivalent managed service on NIC MeghRaj, India's government cloud), placed close to an NDMS point of presence to minimize hop count over the constrained link (PRD §9). Horizontal scaling applies to the stateless FastAPI services; PostGIS scales vertically first, with read replicas for the dashboard's read-heavy queries if district count grows beyond the pilot.
+containers on Kubernetes (or the equivalent managed service on NIC MeghRaj, India's government cloud), placed close to an NDMS point of presence to minimize hop count over the constrained link (PRD §9). Horizontal scaling applies to the FastAPI app; if a router later needs to scale independently of the rest, that's the point at which it would move behind its own service (§3). PostGIS scales vertically first, with read replicas for the dashboard's read-heavy queries if district count grows beyond the pilot.
 
 ## 12. MVP Technical Scope vs. Full Vision
 
@@ -265,19 +267,22 @@ production-scale polling of IMD/Google/INCOIS APIs (the demo uses CWC/data.gov.i
 - Resolved risk: Google's Flood Forecasting API is free but a limited pilot with a multi-month waitlist, confirmed from Google's own documentation — not usable within a hackathon timeline. The team applies for it in parallel as a future upgrade path, but the demo and MVP rely on CWC historical data via data.gov.in instead, which is free and available immediately (§6).
 - Constraint: GSI and NCCR are not live APIs — the ingestion layer treats them as periodically-refreshed datasets, not polled sources.
 - Constraint: IMD's API access terms (rate limits, auth) are unverified as of this writing; the forecasting pipeline is built to degrade to the historical baseline rather than fail if IMD access turns out to be more restricted than expected.
-- Risk: a ten-service split is a lot of surface area for a hackathon team to stand up and integrate in the available time; the fallback is a single FastAPI app with ten routers sharing one process, preserving the same API contracts so the split can happen later without a rewrite.
+- Resolved risk: a many-service split would have been too much surface area for a hackathon team to stand up and integrate in the available time; the build went with a single FastAPI app with a router per functional area sharing one process (§3, §14 decision 1), preserving API contracts so a future split behind its own service remains possible without a rewrite.
 - Risk: OSRM's road-network extract for Dima Hasao may be sparse in OpenStreetMap coverage for a rural, hilly district; this should be verified early, with a manual road-graph patch as a fallback if OSM coverage is too thin to produce sensible routes.
 - Risk: training data for the susceptibility and forecasting models is limited to what the published Dima Hasao research and available historical records provide; model outputs for the demo should be presented with that caveat rather than overstated confidence.
 
-## 14. Open Technical Decisions for the Team
+## 14. Resolved Technical Decisions
 
-- Service granularity: ship as ten separate containers, or one FastAPI app with ten routers, for the hackathon build (§11 fallback noted). Recommendation: start as one app with routers; split only the services that need independent scaling if time allows.
-- Survey approval workflow implementation: confirms the PRD's recommended default (§7.10) — immediate update with an “unreviewed” tag. Needs sign-off from the team, not just the technical default.
-- Model choice for forecasting: XGBoost (simpler, faster to train and explain) vs. a small LSTM (better suited to time-series structure but harder to explain and slower to get right in the time available). Recommendation: XGBoost for the hackathon, given the explainability requirement (PRD §10) and time constraints.
-- Whether to attempt the Siamese U-Net for change detection or ship the differencing/thresholding baseline only. Recommendation: build the baseline first, treat the U-Net as a stretch goal only if time remains.
+All four decisions below were open at design time and have since been ratified and built; kept here as the record of what was decided and why, not as open items.
+
+1. **Service granularity: one FastAPI app with routers, not separate containers per service** (§3, §11, §13). Confirmed in `backend/app/main.py`, currently 14 routers plus auth sharing one process. Split a router into its own service only if it later needs independent scaling.
+2. **Survey approval workflow: the PRD's recommended default** (§7.10) — immediate update with an “unreviewed” tag, resolved to “approved”/“flagged” on supervisor review. Shipped as the `review_status` enum (Backend Schema §3) and the Survey Review screen's approve/flag actions.
+3. **Forecasting model: XGBoost**, not an LSTM, for explainability and time (PRD §10). Shipped in Phase 10 (`docs/BUILD-PLAN.md`) with real per-prediction SHAP factor contributions — see `backend/app/services/forecasts.py`.
+4. **Change detection: the differencing/thresholding baseline, not the Siamese U-Net.** Shipped in Phase 11 as CV differencing/thresholding on one curated before/after Sentinel pair (`docs/BUILD-PLAN.md`); the U-Net remains designed-for-not-built stretch scope, unstarted.
 
 ## 15. Related Documents
 
-- Product Requirements Document (PRD) — v1.1, defines the what and why this document implements.
-- UI/UX Design Document — dashboard layouts, survey-app flow, wireframes (planned, not yet built).
-- Backend Schema Document — full column-level data models for zones, households, shelters, surveys, and relocation records (planned, not yet built; §5 of this document gives the entity-level shape it will formalize).
+- Product Requirements Document (`docs/PRD.md`) — v1.1, defines the what and why this document implements.
+- Design System (`docs/DESIGN-SYSTEM.md`) — dashboard layouts, survey-app flow, colour tokens, screen inventory.
+- Backend Schema (`docs/BACKEND-SCHEMA.md`) — full column-level data models for zones, households, shelters, surveys, and relocation records; §5 of this document gives the entity-level shape it formalizes.
+- Build Plan (`docs/BUILD-PLAN.md`) — the conflict-resolution record behind §14 above and the phase-by-phase build order actually followed.

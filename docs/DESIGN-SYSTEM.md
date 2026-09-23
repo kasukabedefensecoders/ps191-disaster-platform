@@ -185,7 +185,15 @@ Built and interactive in the prototype. Each maps to the functional requirement 
 |---|---|
 | Situation dashboard — read-only district view: zones, relocation progress, alerts | §7.8 |
 
-**Not yet built:** post-incident feedback loop (§7.12). This is the screen that closes the loop between what the model predicted and what actually happened, and it is the natural answer to *"how do you know your risk model is right?"* — worth building if time allows, worth naming as designed-not-built if it doesn't.
+### Shelter officer — live app only, not in the prototype
+
+A fourth role added after the prototype was frozen (`docs/BUILD-PLAN.md` Phase 8; role and auth model in `docs/TRD.md` §10). Authenticates with a bare shelter display code (e.g. `SH-01`), not an account — a deliberately weaker credential scoped only to that one shelter, never the full shelter list.
+
+| Screen | PRD § |
+|---|---|
+| Shelter officer dashboard — single-shelter occupancy, facilities, contact, needs list, status, reachable at `/shelter-dashboard/:code` | §7.4 |
+
+**Not built in the prototype:** post-incident feedback loop (§7.12) — the screen that closes the loop between what the model predicted and what actually happened, and the natural answer to *"how do you know your risk model is right?"* The prototype was frozen as a reference before this was decided; the live app added the screen in Phase 13 (`docs/BUILD-PLAN.md`) once the core loop (Phases 1–9) was done with time to spare — see `frontend/src/pages/IncidentOutcomes.tsx`.
 
 ---
 
@@ -200,4 +208,4 @@ The basemap is real OpenStreetMap geography over Dima Hasao — Haflong, Maibang
 - **Light theme is partial.** Markup is fully tokenised, but several colour maps computed in the view layer (survey review chips, handoff status chips, household source, shelter occupancy bars, logistics status, field queue priority) resolve to dark-theme hex regardless of theme. Dark is the demo default and the intended operating mode; the light override is not presentation-ready.
 - **Colour-blind-safe variant covers tier badges only** (see §2.6).
 - **No accessibility semantics.** All interactive elements are real buttons, but the document has no heading hierarchy, no ARIA attributes, and form labels are not programmatically associated with their inputs. This is a genuine gap for a government-facing platform and is the first thing to address past the hackathon.
-- **§7.12 has no screen** (see §5).
+- **§7.12 has no screen in the prototype** (see §5) — the live app has since added one; see §5's note.

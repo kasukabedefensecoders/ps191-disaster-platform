@@ -36,7 +36,7 @@ This document is scoped to the same MVP as the PRD/TRD: every table here is buil
 - **Enumerated states use native Postgres `ENUM` types**, not free-text columns with a check constraint maintained elsewhere — this keeps invalid states (e.g., a relocation record with a typo'd status) impossible at the database level rather than caught later in application code.
 - **Explainability fields are `jsonb`, not a foreign key to a separate "factors" table.** TRD Principle 3 requires every score/priority/ranking to return a `factors[]` array of `{name, weight, input_value, contribution}` alongside the number. Modeling this relationally would mean a join on every dashboard read for no query benefit — factors are always read as a unit with their parent score, never queried independently. §6 below gives the exact shape.
 - **Schema name:** all tables live in the default `public` schema for the hackathon build; no multi-tenancy schema-per-district split is needed at pilot scale (one district, Dima Hasao).
-- **Migrations:** managed with Alembic (ships with FastAPI/SQLAlchemy tooling already in the stack — TRD §4) rather than hand-run SQL, so the ten-service (or ten-router) team isn't drifting on schema state during the hackathon build.
+- **Migrations:** managed with Alembic (ships with FastAPI/SQLAlchemy tooling already in the stack — TRD §4) rather than hand-run SQL, so the multi-router team isn't drifting on schema state during the hackathon build.
 
 ```sql
 create extension if not exists postgis;
@@ -75,7 +75,7 @@ create type priority_tier as enum (
 );
  
 create type shelter_status as enum (
-  'active', 'full', 'closed', 'damaged'
+  'active', 'standby', 'full', 'closed', 'damaged'
 );
  
 create type review_status as enum (
@@ -717,6 +717,7 @@ create policy relocation_access on relocation_records
 
 ## 10. Related Documents
 
-- **Product Requirements Document (PRD)** — v1.1, defines the *what* and *why*.
-- **Technical Requirements Document (TRD)** — v1.0, defines system architecture and fixes the entity-level shape this document formalizes (TRD §5).
-- **UI/UX Design Document** — dashboard layouts, survey-app flow, wireframes (planned, not yet built).
+- **Product Requirements Document (`docs/PRD.md`)** — v1.1, defines the *what* and *why*.
+- **Technical Requirements Document (`docs/TRD.md`)** — v1.0, defines system architecture and fixes the entity-level shape this document formalizes (TRD §5).
+- **Design System (`docs/DESIGN-SYSTEM.md`)** — dashboard layouts, survey-app flow, colour tokens, screen inventory.
+- **Build Plan (`docs/BUILD-PLAN.md`)** — the conflict-resolution record behind this document's resolved enums and column additions.

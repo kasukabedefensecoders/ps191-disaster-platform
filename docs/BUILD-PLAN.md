@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Purpose** | Resolve the four known schema/prototype conflicts, flag two more the team missed, and set a build order for the hackathon MVP. |
-| **Status** | Recommendation — needs team sign-off before Phase 0 starts, since every downstream phase reads the resolved enums. |
+| **Status** | Resolved and executed. Part 1/2's decisions were ratified and Phases 0–13 have since shipped (see commit history); kept here as the build-order record, not an open recommendation. |
 | **Relates to** | CLAUDE.md "Known conflicts"; `docs/BACKEND-SCHEMA.md` §3, §5.3–5.6; `docs/PRD.md` §7.1–7.3, §7.10; `docs/TRD.md` §5, §8.1 |
 
 ---
@@ -150,9 +150,13 @@ Wire Phase 2's `vulnScore`/`prioScore`/`prioTier` into `GET /zones/{id}/househol
 
 Shelter CRUD with the `current_occupancy <= max_capacity` check already in the schema; matching endpoint wired to `matchFactors`/`matchScore`.
 
+**Migration `0004`** later added a `standby` shelter status plus `contact_name`/`contact_phone`/`needs` columns, so the shelter officer dashboard has a real point of contact and a running needs list to show, not just occupancy — see Backend Schema §5.5.
+
 ### Phase 6 — Logistics tracking (7.6) (M) — depends on Phase 5
 
 `relocation_records` state machine (`assigned → in_transit → arrived`), vehicle/escort assignment. **This is also where the `audit_log` write path gets built once and reused everywhere** (rule 2) — every relocation decision and every priority-ranking write needs an audit row; build the helper here rather than bolting it onto each service separately later.
+
+**Migration `0005`** added `display_code`/`route_label` to `vehicles` (`VH-01`/`VH-02` trucks, `BUS-01`…`BUS-05` buses), matching the human-readable display-code convention the other entities already use — see CLAUDE.md's ID list and Backend Schema §5.7.
 
 **"Reset demo data" (`POST /demo/seed-relocations`, `sdma_official`-only).** The Logistics Tracker's "Load demo data" button (`services/demo_seed.py`) started as a seed-once-then-no-op action; it's now a true reset on every call, because a hackathon judge re-running the demo mid-session needs the same fresh scenario each time, not whatever state the last click (or a field officer's own testing) left behind. A click deletes `relocation_records` and `surveys` (and their dependents — `handoff_logs`/`incident_outcomes` rows linked to a relocation, both FK'd with no `ON DELETE` clause so they must go first), resets `vehicles.status` back to `available` and `shelters.current_occupancy` back to `app/seed.py`'s own seeded baseline (both are fields the relocation lifecycle mutates in place, so a reset that skipped them would leave stale occupancy/status behind rows that no longer exist), then reseeds the same 5-bus / 11-household / 8-survey plan through the real allocation/status/review services — same factor snapshots and `audit_log` rows a hand-run allocation would produce. `audit_log` itself is never touched or deletable (rule 2; enforced at the grant level, not just by convention). This needed a new migration (`0006`): `app_user` had no `DELETE` grant on *any* table before this (migration `0002` only ever granted `SELECT`/`INSERT`/`UPDATE`), so the reset now has a narrowly-scoped `DELETE` grant on exactly the four tables it touches — see Backend Schema §7. The demo vehicle fleet is buses only — this platform models *pre-disaster* predictive relocation (moving households out ahead of a forecast hazard), so the seeded scenario assumes the road network is still intact; no boats/amphibious vehicles.
 
@@ -177,6 +181,8 @@ Survey capture form, IndexedDB/Dexie offline queue, sync endpoint doing `insert 
 ### Phase 10 — Predictive risk forecasting (7.9) (M) — depends on Phase 3's historical rainfall baseline
 
 XGBoost/regression 72h score with `factors[]`, one `risk_forecasts` row per zone per horizon bucket per generation cycle (not one row holding all six buckets — that's a modeling difference from the prototype's `forecastRow()` worth noting explicitly, since it changes how the ingestion job writes results). Per TRD §14, default to XGBoost over an LSTM for explainability and time.
+
+**Migration `0007`** granted `app_user` a narrowly-scoped `DELETE` on `risk_forecasts`, so the Phase 6 demo-reset flow can clear stale forecast rows on each reseed the same way it already clears `relocation_records`/`surveys` — see Backend Schema §7.
 
 ### Phase 11 — Change detection (7.11) (S) — fully independent; good early pickup
 

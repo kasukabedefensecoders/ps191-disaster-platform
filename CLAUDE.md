@@ -10,7 +10,7 @@ Pilot district: **Dima Hasao, Assam**.
 ## Repository layout
 
 ```
-docs/          PRD.md, TRD.md, BACKEND-SCHEMA.md, DESIGN-SYSTEM.md
+docs/          PRD.md, TRD.md, BACKEND-SCHEMA.md, DESIGN-SYSTEM.md, BUILD-PLAN.md
 PROTOTYPE/     the Claude Design prototype (reference only, does not run)
 ```
 
@@ -18,7 +18,7 @@ PROTOTYPE/     the Claude Design prototype (reference only, does not run)
 
 ## Read these before writing code
 
-The four documents in `docs/` are the source of truth. Read the one that owns a decision rather than inferring it from code.
+The five documents in `docs/` are the source of truth. Read the one that owns a decision rather than inferring it from code.
 
 | Document | Authoritative for |
 |---|---|
@@ -26,23 +26,24 @@ The four documents in `docs/` are the source of truth. Read the one that owns a 
 | `docs/TRD.md` | Architecture, tech stack §4, entity model §5, external API integration §6, the three genuine ML components §8, offline design §9, RBAC §10. |
 | `docs/BACKEND-SCHEMA.md` | Column-level DDL, enum types, JSONB field shapes §6, row-level security §7. |
 | `docs/DESIGN-SYSTEM.md` | Colour tokens (both themes), typography, interface principles, screen inventory. |
+| `docs/BUILD-PLAN.md` | The conflict-resolution record (why each of the resolved conflicts below went the way it did) and the phase-by-phase build order, kept current against commit history. |
 
 When a document and this file disagree, the document wins — say so rather than picking silently.
 
 ---
 
-## Known conflicts — resolve before building, do not guess
+## Resolved conflicts — do not re-litigate
 
-The Backend Schema and the prototype disagree in four places. Both were written independently and neither is automatically right. Raise these and get a decision before writing the models:
+The Backend Schema and the prototype originally disagreed in four places. These were resolved during Phase 0 (see `docs/BUILD-PLAN.md` Part 1 for the reasoning behind each) and have shipped ever since — `docs/BACKEND-SCHEMA.md` and `backend/app/models/enums.py` agree with each other on all four:
 
-| | Backend Schema | Prototype |
+| | Resolved value | Went with |
 |---|---|---|
-| Priority tier values | `immediate` / `short_term` / `medium_term` | `immediate` / `short` / `medium` |
-| Score range | `numeric(5,4)`, 0–1 | integers, 0–100 |
-| Structural condition | `sound` / `at_risk` / `unsafe` / `unknown` | `Kutcha` / `Semi-pucca` / `Pucca` |
-| Survey review status | `unreviewed` / `confirmed` / `corrected` | `unreviewed` / `approved` / `flagged` |
+| Priority tier values | `immediate` / `short_term` / `medium_term` | Backend Schema |
+| Score range | `numeric(5,4)`, 0–1 | Backend Schema |
+| Structural condition | `Kutcha` / `Semi-pucca` / `Pucca` / `unknown` | Prototype |
+| Survey review status | `unreviewed` / `approved` / `flagged` | Prototype |
 
-The structural-condition one matters most: the prototype's values are Indian construction categories that a field officer in Dima Hasao would actually recognise and that map directly onto a vulnerability weight, while the schema's are generic condition labels. They are not the same axis and one does not convert into the other.
+Structural condition was the one that mattered most: the prototype's values are Indian construction categories a field officer in Dima Hasao would actually recognise, and they map directly onto the vulnerability weight in `vulnFactors()` — the schema's original generic labels had no such mapping. If new code or docs disagree with the table above, the table is right and the other one needs fixing, not the reverse.
 
 ---
 
@@ -105,13 +106,13 @@ Built: zone mapping with real GSI + published Dima Hasao susceptibility research
 
 Not built (design the seam, leave the implementation): live Google Flood Forecasting polling (waitlisted — use CWC historical via data.gov.in), NDMS VSAT integration, Sachet push, live agency-to-agency handoff, continuously-polling satellite change detection, production Kubernetes deployment.
 
-PRD §7.12 (post-incident feedback loop) has a table in the schema (`incident_outcomes`) but no screen in the prototype. Build the table; build the screen only if the core loop is done.
+PRD §7.12 (post-incident feedback loop) has a table in the schema (`incident_outcomes`) and, as of Phase 13, a screen too (`frontend/src/pages/IncidentOutcomes.tsx`) — it was stretch scope until the core loop (Phases 1–9) was done with time to spare.
 
 ---
 
 ## Working style
 
 - No comments in code unless something is genuinely non-obvious.
-- Match the prototype's ID conventions in seed data: `ZN-01` zones, `HH-112` households, `SH-01` shelters, `MV-118` moves, `SV-4471` surveys, `HO-221` handoffs, `RT-07` routes. Primary keys themselves are UUIDs per Backend Schema §2 — these are human-readable display codes, so they need their own column.
+- Match the prototype's ID conventions in seed data: `ZN-01` zones, `HH-112` households, `SH-01` shelters, `MV-118` moves, `SV-4471` surveys, `HO-221` handoffs, `RT-07` routes, `VH-01`/`BUS-01` vehicles (trucks and buses get their own prefix). Primary keys themselves are UUIDs per Backend Schema §2 — these are human-readable display codes, so they need their own column.
 - Before a schema change, check `docs/BACKEND-SCHEMA.md` and update it in the same commit.
 - Say when something in the docs is wrong or unbuildable rather than working around it quietly.

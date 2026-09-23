@@ -136,7 +136,7 @@ A rolling ~72-hour risk score per zone, combining live triggering-condition data
 
 Field officers receive a prioritized list of zones to survey — new/unverified zones first, then zones due for scheduled or forecast-triggered re-verification. They complete a structured checklist matching the vulnerability-assessment fields (household count, elderly/children/assistance-needs count, structural condition, population), attach a photo and GPS geotag, and submit. Submissions are captured offline-first and sync when connectivity is available.
 
-***Open decision:*** *whether a submitted survey updates the live map immediately (tagged “unreviewed” until a supervisor confirms) or requires supervisor approval before going live. Recommended default: immediate update with a visible “unreviewed” tag, for response speed, with supervisor downgrade/correction after the fact — to be confirmed by the team.*
+***Resolved:*** *a submitted survey updates the live map immediately, tagged “unreviewed,” with supervisor review after the fact resolving it to “approved” or “flagged” — the recommended default above, ratified in `docs/BUILD-PLAN.md` §1.4 and shipped as the `review_status` enum (Backend Schema §3) and the Survey Review screen's approve/flag actions.*
 
 ### 7.11 Satellite/SAR Rapid Damage Detection
 
@@ -211,16 +211,19 @@ The platform is authority-facing, not citizen-facing, so it does not need to bui
 
 ## 13. Open Decisions for the Team
 
-- Field survey approval workflow: immediate update with “unreviewed” tag, or supervisor approval before going live (recommendation in section 7.10).
-- Whether the “push to Sachet” citizen-alert integration is worth listing as a stretch goal in the pitch.
-- How much of the interagency handoff (7.13) to actually demo vs. describe as future scope, given hackathon time constraints.
+- Whether the “push to Sachet” citizen-alert integration is worth listing as a stretch goal in the pitch — a presentation call, not a build one; still open.
 
 ***Resolved:*** *pilot district is Dima Hasao, Assam (section 6).*
 
-## 14. Related Documents (planned, not yet built)
+***Resolved:*** *field survey approval workflow — immediate update with an “unreviewed” tag, supervisor review after the fact (section 7.10).*
 
-This PRD defines what the platform needs to do and why, for a product audience. The following documents will cover how:
+***Resolved:*** *interagency handoff (7.13) demo scope — `handoff_logs` CRUD plus a status flag on the dashboard is built and demoed; live agency-to-agency handoff (the actual cross-system transfer) is designed-for-but-not-built, per section 6.*
 
-- **Technical Requirements Document (TRD) —** architecture, tech stack (frontend/backend/database/GIS library/AI-ML approach), API integration details, system diagrams.
-- **UI/UX Design Document —** dashboard layouts, survey-app flow, wireframes.
-- **Backend Schema Document —** data models for zones, households, shelters, surveys, and relocation records.
+## 14. Related Documents
+
+This PRD defines what the platform needs to do and why, for a product audience. The following documents cover how:
+
+- **Technical Requirements Document (`docs/TRD.md`) —** architecture, tech stack (frontend/backend/database/GIS library/AI-ML approach), API integration details, system diagrams.
+- **Design System (`docs/DESIGN-SYSTEM.md`) —** dashboard layouts, survey-app flow, colour tokens, screen inventory.
+- **Backend Schema (`docs/BACKEND-SCHEMA.md`) —** data models for zones, households, shelters, surveys, and relocation records.
+- **Build Plan (`docs/BUILD-PLAN.md`) —** the conflict-resolution record and phase-by-phase build order actually followed.
