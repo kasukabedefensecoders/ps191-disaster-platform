@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 
-import RouteMap from "../components/RouteMap";
+import RouteMap, { type RouteMapEntry } from "../components/RouteMap";
 import { SampleDataBadge } from "../components/badges";
 import { addBlockedSegment, clearBlockedSegments, fetchRoutes, fetchShelters, fetchZones, type RouteRecord, type Shelter, type Zone } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
@@ -16,6 +16,11 @@ export default function RoutesPage() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reasonDraft, setReasonDraft] = useState<Record<string, string>>({});
+  // The map draws exactly one route at a time — all four overlapping in
+  // the same colour made it impossible to tell them apart. null until the
+  // first route is auto-selected below (or the user clicks a different
+  // card), never "several selected at once".
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   // Keyed by route_id, which is stable across "Reset demo data" (routes
   // are baseline data like zones/shelters, never recreated by a reset) —
   // so this cache naturally satisfies "fetch once per pair" without any
@@ -63,6 +68,31 @@ export default function RoutesPage() {
     return { ...r, path: osrm.path, distance_km: osrm.distance_km, estimated_duration_minutes: Math.round(osrm.duration_minutes) };
   });
 
+  const sortedRoutes = [...displayRoutes].sort((a, b) =>
+    (zonesById[a.zone_id]?.display_code ?? "").localeCompare(zonesById[b.zone_id]?.display_code ?? ""),
+  );
+
+  // Nothing selected yet (first load, or the previously-selected route was
+  // somehow removed) falls back to the first route in list order — never
+  // "no route" while any exist, and never "several at once".
+  const activeRouteId = selectedRouteId && sortedRoutes.some((r) => r.route_id === selectedRouteId) ? selectedRouteId : (sortedRoutes[0]?.route_id ?? null);
+  const activeRoute = sortedRoutes.find((r) => r.route_id === activeRouteId) ?? null;
+  const mapRoutes: RouteMapEntry[] = activeRoute
+    ? [
+        {
+          ...activeRoute,
+          originLabel: (() => {
+            const zone = zonesById[activeRoute.zone_id];
+            return zone ? `${zone.display_code} · ${zone.name}` : undefined;
+          })(),
+          destLabel: (() => {
+            const shelter = sheltersById[activeRoute.shelter_id];
+            return shelter ? `${shelter.display_code} · ${shelter.name}` : undefined;
+          })(),
+        },
+      ]
+    : [];
+
   const report = async (routeId: string) => {
     if (!token) return;
     const reason = (reasonDraft[routeId] ?? "").trim();
@@ -98,22 +128,41 @@ export default function RoutesPage() {
   return (
     <div style={{ display: "flex", height: "100%" }}>
       <div style={{ flex: 2, position: "relative", borderRight: "1px solid var(--border)" }}>
-        <RouteMap routes={displayRoutes} theme={theme} />
+        <RouteMap routes={mapRoutes} theme={theme} />
+        {mapRoutes.length === 0 && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg2)" }}>
+            <span style={{ fontFamily: "var(--font-data)", fontSize: 12, color: "var(--ink4)" }}>Select a route to view it.</span>
+          </div>
+        )}
         <div style={{ position: "absolute", left: 10, bottom: 10, zIndex: 500 }}>
           <SampleDataBadge />
         </div>
       </div>
       <div style={{ flex: 1, minWidth: 360, maxWidth: 440, overflow: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
         <h2 style={{ fontSize: 18, marginBottom: 8 }}>Evacuation routes</h2>
-        {displayRoutes.length === 0 && <p style={{ fontSize: 12, color: "var(--ink3)" }}>No routes recorded.</p>}
-        {[...displayRoutes]
-          .sort((a, b) => (zonesById[a.zone_id]?.display_code ?? "").localeCompare(zonesById[b.zone_id]?.display_code ?? ""))
-          .map((r) => {
+        {sortedRoutes.length === 0 && <p style={{ fontSize: 12, color: "var(--ink3)" }}>No routes recorded.</p>}
+        {sortedRoutes.map((r) => {
           const blocked = r.blocked_segments.length > 0;
           const zone = zonesById[r.zone_id];
           const shelter = sheltersById[r.shelter_id];
+          const selected = r.route_id === activeRouteId;
           return (
-            <div key={r.route_id} className="ps-card-hover" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 6, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div
+              key={r.route_id}
+              onClick={() => setSelectedRouteId(r.route_id)}
+              className="ps-card-hover"
+              style={{
+                background: "var(--panel)",
+                border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}`,
+                boxShadow: selected ? "0 0 0 1px var(--accent)" : "none",
+                borderRadius: 6,
+                padding: 12,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                cursor: "pointer",
+              }}
+            >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontFamily: "var(--font-data)", fontWeight: 600 }}>{r.display_code}</span>
                 <span style={{ fontFamily: "var(--font-data)", fontSize: 11, color: blocked ? "var(--sev1)" : "var(--sev5)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
