@@ -41,7 +41,7 @@ def _sync_one(db: Session, item, officer_id: uuid.UUID) -> tuple[uuid.UUID, str]
             raise SurveySyncError("zone not found")
         household = Household(
             household_id=uuid.uuid4(),
-            display_code=next_display_code(db, "HH", Household.display_code),
+            display_code=next_display_code(db, "HH"),
             zone_id=item.zone_id,
             geom=f"SRID=4326;POINT({item.geotag['coordinates'][0]} {item.geotag['coordinates'][1]})",
             population_count=item.payload.population_count,
@@ -68,7 +68,7 @@ def _sync_one(db: Session, item, officer_id: uuid.UUID) -> tuple[uuid.UUID, str]
         lon, lat = item.geotag["coordinates"]
         geotag_expr = f"SRID=4326;POINT({lon} {lat})"
 
-    display_code = existing_survey.display_code if existing_survey is not None else next_display_code(db, "SV", Survey.display_code)
+    display_code = existing_survey.display_code if existing_survey is not None else next_display_code(db, "SV")
 
     stmt = pg_insert(Survey).values(
         survey_id=item.survey_id,

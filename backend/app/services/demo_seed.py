@@ -186,7 +186,7 @@ def _seed_surveys(db: Session, sdma_user_id: uuid.UUID):
         submitted_at = now - timedelta(hours=len(SURVEY_PLAN) - index)
         survey = Survey(
             survey_id=uuid.uuid4(),
-            display_code=next_display_code(db, "SV", Survey.display_code),
+            display_code=next_display_code(db, "SV"),
             zone_id=zone.zone_id,
             household_id=household.household_id,
             officer_id=field_officer.user_id,
@@ -206,7 +206,7 @@ def _seed_surveys(db: Session, sdma_user_id: uuid.UUID):
             survey.reviewed_by = sdma_user_id
             survey.reviewed_at = submitted_at + timedelta(minutes=30)
         db.add(survey)
-        db.flush()  # so next_display_code sees this row before computing the next SV-N (autoflush=False)
+        db.flush()  # surfaces any constraint violation per-row rather than batched at commit
         created.append(survey)
 
     db.commit()

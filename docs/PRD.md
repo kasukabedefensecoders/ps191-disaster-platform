@@ -11,7 +11,6 @@
 | Department | National Disaster Response Force (NDRF), Disaster Management Division |
 | Category | Software |
 | Theme | Disaster Management |
-| Institution | Pillai University (PCACS), Panvel |
 | Document Owner | Kasukabe Defense Coders |
 | Version | 1.0 (Team approved) |
 | Date | September 2026 |
@@ -50,6 +49,7 @@ The platform doesn't try to replace India's existing hazard-monitoring infrastru
 | State/District Disaster Management Authority (SDMA) official | Primary user of the central dashboard. Views red zones, vulnerability data, shelter status, and relocation recommendations; makes and records relocation decisions. |
 | NDRF field officer / surveyor | Uses the survey module to verify and update ground-level data — household counts, vulnerability factors, structural condition — for assigned zones. |
 | District control room / emergency operations center | Consumes the live dashboard during an active event: affected zones, blocked routes, shelter capacity, medical/rescue needs. |
+| Shelter officer | A fourth role, added once the platform moved past the design prototype (see `docs/TRD.md` §10). Manages one specific shelter's own occupancy count, facility flags, contact details and outstanding needs list, via a lighter-weight sign-in scoped to that single shelter — not a full authority account. |
 
 **Out of scope for this platform:** direct citizen-facing alerting and emergency communication. That problem is already addressed by NDMA's Sachet common-alerting platform; this system is built for the authorities who decide and coordinate relocation, per the PS's own framing (“deliver evidence-based guidance to State Disaster Management Authorities”). A future integration that pushes this platform's alerts into Sachet is listed as a stretch goal, not a core requirement.
 
@@ -80,12 +80,13 @@ Hackathon judges respond well to a team that knows exactly what it can demo vers
 
 #### Demo-able for the hackathon (MVP)
 
-- Red zone map for Dima Hasao district, built from GSI susceptibility data, published academic susceptibility research for the district, and IMD rainfall data as the live trigger
+- Red zone map for Dima Hasao district, built from GSI classification research and published academic susceptibility research for the district, encoded as labeled sample data rather than pulled from a live feed — no live IMD/CWC/GSI polling is built in the current pilot (see `docs/TRD.md` §8.2, §11); the "live trigger" concept is demonstrated as a jittered placeholder each time a forecast is regenerated, not an actual external API call
 - Vulnerability scoring and relocation priority ranking, computed from sample household data
 - Shelter capacity matching for a small, seeded set of shelters
 - Field officer survey module (mobile-responsive web form is sufficient for a demo), with offline capture simulated
+- Shelter officer self-service dashboard — a single shelter's own occupancy, facilities and needs, kept separate from the main authority dashboard
 - Central dashboard tying the above together
-- A before/after satellite image pair demonstrating the change-detection concept (not a live feed)
+- The real change-detection pipeline (differencing, thresholding, contour extraction) running against one curated, clearly-labeled synthetic before/after image pair — not an actual satellite image and not a live feed; see `docs/TRD.md` §8.3
 
 #### Designed for, not built for the demo
 
@@ -110,7 +111,7 @@ Computes a priority tier — immediate, short-term, medium-term — per zone or 
 
 ### 7.4 Shelter Suitability & Carrying Capacity
 
-Tracks each shelter's maximum capacity, current occupancy, and available facilities (water, medical, toilets, other basic amenities), kept current as relocations occur.
+Tracks each shelter's maximum capacity, current occupancy, and available facilities (water, medical, toilets, other basic amenities), kept current as relocations occur. Occupancy and facility state don't only update as a side effect of relocation decisions made elsewhere — each shelter also has its own officer, who can sign in (with a lighter-weight, shelter-specific credential, not a full authority account) and update their shelter's own occupancy, facilities and outstanding needs list directly, so the numbers an SDMA official allocates against reflect what the shelter itself is reporting, not just what the last relocation decision implied.
 
 ### 7.5 Optimal Relocation Allocation (matching engine)
 

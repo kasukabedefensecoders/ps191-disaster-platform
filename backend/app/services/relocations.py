@@ -109,7 +109,7 @@ def _auto_handoffs_on_arrival(db: Session, record: RelocationRecord, household: 
     for need_type, agency in needs:
         db.add(
             HandoffLog(
-                display_code=next_display_code(db, "HO", HandoffLog.display_code),
+                display_code=next_display_code(db, "HO"),
                 need_type=need_type,
                 agency=agency,
                 linked_record_id=record.record_id,
@@ -117,11 +117,6 @@ def _auto_handoffs_on_arrival(db: Session, record: RelocationRecord, household: 
                 description=f"Auto-flagged on arrival of {record.display_code} ({household.display_code}).",
             )
         )
-        # The session has autoflush=False (app/db.py) — without this,
-        # next_display_code's own SELECT can't see the row just added
-        # above, and two needs on the same household would both compute
-        # the same "next" HO-N and collide on handoff_logs' unique index.
-        db.flush()
 
 
 class RelocationError(ValueError):
@@ -193,7 +188,7 @@ def create_relocation(db: Session, payload: RelocationRecordCreate, decided_by: 
 
     record = RelocationRecord(
         record_id=uuid.uuid4(),
-        display_code=next_display_code(db, "MV", RelocationRecord.display_code),
+        display_code=next_display_code(db, "MV"),
         household_id=household.household_id,
         shelter_id=shelter.shelter_id,
         vehicle_id=vehicle.vehicle_id if vehicle else None,

@@ -17,7 +17,7 @@ from .display_codes import next_display_code
 def create_handoff(db: Session, payload: HandoffLogCreate) -> HandoffLogOut:
     handoff = HandoffLog(
         log_id=uuid.uuid4(),
-        display_code=next_display_code(db, "HO", HandoffLog.display_code),
+        display_code=next_display_code(db, "HO"),
         need_type=payload.need_type,
         agency=payload.agency,
         description=payload.description,

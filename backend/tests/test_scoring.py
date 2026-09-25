@@ -6,6 +6,16 @@ independently hand-computed from PROTOTYPE/PS191 Platform.dc.html's
 vulnFactors()/prioFactors() arithmetic (including its exact per-factor
 Math.round-then-sum order) against app.seed's ZONES/HOUSEHOLDS fixtures,
 not derived from running this code — that's the point of the check.
+
+Priority expectations were recomputed (vuln expectations are untouched —
+vuln_score has no zone dependency) after a real seed-data bug fix, found
+by hand-verifying the forecast model in Docker: app.seed's ZONES previously
+carried each zone's risk_score_72h as the prototype's *6-hour* peak value
+(0.88/0.81/0.76/0.54), not its actual 72-hour value (0.41/0.48/0.36/0.31) —
+confirmed by comparing against ml/forecast_model.py's own training targets.
+Since risk_score_72h is prio_score's highest-weighted factor (32%), the
+corrected, roughly-halved risk values shift 6 of these 11 households down
+a tier (mostly immediate -> short_term) versus the old, inflated numbers.
 """
 import pytest
 
@@ -50,17 +60,17 @@ def _household_dict(household_code: str) -> tuple[dict, str]:
 # household code -> (vuln_score, prio_score, prio_tier), hand-computed from
 # the prototype's own arithmetic (see module docstring).
 EXPECTED = {
-    "HH-112": (0.90, 0.86, "immediate"),
-    "HH-104": (0.65, 0.79, "immediate"),
-    "HH-107": (0.43, 0.73, "immediate"),
-    "HH-118": (0.10, 0.64, "short_term"),
-    "HH-203": (0.80, 0.85, "immediate"),
-    "HH-211": (0.35, 0.73, "immediate"),
-    "HH-219": (0.38, 0.74, "immediate"),
-    "HH-305": (0.73, 0.72, "immediate"),
-    "HH-309": (0.29, 0.60, "short_term"),
-    "HH-402": (0.31, 0.54, "short_term"),
-    "HH-408": (0.60, 0.57, "short_term"),
+    "HH-112": (0.90, 0.71, "immediate"),
+    "HH-104": (0.65, 0.64, "short_term"),
+    "HH-107": (0.43, 0.58, "short_term"),
+    "HH-118": (0.10, 0.49, "short_term"),
+    "HH-203": (0.80, 0.74, "immediate"),
+    "HH-211": (0.35, 0.62, "short_term"),
+    "HH-219": (0.38, 0.63, "short_term"),
+    "HH-305": (0.73, 0.60, "short_term"),
+    "HH-309": (0.29, 0.48, "short_term"),
+    "HH-402": (0.31, 0.47, "medium_term"),
+    "HH-408": (0.60, 0.50, "short_term"),
 }
 
 

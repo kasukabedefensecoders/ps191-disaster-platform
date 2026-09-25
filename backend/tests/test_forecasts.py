@@ -4,6 +4,7 @@ placeholder). Checks the factors[] shape (rule 1), one row per horizon per
 generation cycle (not one row for all six), RLS scoping, and that the
 zones.risk_score_72h denormalized cache actually gets refreshed.
 """
+import pytest
 from sqlalchemy import text
 
 from .conftest import login
@@ -53,6 +54,15 @@ def test_generate_produces_one_row_per_horizon_with_real_factors(client, admin_d
             assert len(f["factors"]) == 4
             for factor in f["factors"]:
                 assert set(factor.keys()) == {"name", "weight", "input_value", "contribution"}
+            # Rule 1 ("every score returns its factors") means the factors
+            # have to actually reconstruct the score, not just be shaped
+            # right — a real bug here (dividing the SHAP rescale by
+            # base_value + shap_sum instead of shap_sum alone) shipped with
+            # this exact shape passing every other assertion in this test,
+            # while the contributions summed to a wildly different, even
+            # wrong-signed, number. Found and fixed by hand-verifying the
+            # model in Docker; pinning it here so it can't silently return.
+            assert sum(fa["contribution"] for fa in f["factors"]) == pytest.approx(f["score"], abs=0.01)
 
         # different horizons for the same zone must not all get identical
         # factors — that would mean horizon_hours isn't actually influencing

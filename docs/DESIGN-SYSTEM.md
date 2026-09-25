@@ -134,7 +134,9 @@ Uppercase with wide tracking (`letter-spacing: .06em`–`.14em`) marks the syste
 
 **State reads before number.** Severity and status are encoded in form as well as value — a filled chip, a severity stripe, a rank badge — so that what needs attention surfaces on a screen that is scanned rather than read.
 
-**Illustrative data is labelled as illustrative.** A `SAMPLE DATA` chip sits in the persistent application header, so it is present on every screen rather than on a disclaimer slide. Where a specific asset is not what it appears to be — the SAR scene is a sample Sentinel-1 capture, not Dima Hasao imagery — the caption says so on the asset itself. Basemap geography is real; zone footprints, populations and route status are sample data, and the map captions separate the two.
+**Illustrative data is labelled as illustrative.** A `SAMPLE DATA` chip sits in the persistent application header, so it is present on every screen rather than on a disclaimer slide. Where a specific asset is not what it appears to be, the principle is that the caption should say so on the asset itself, not just rely on the page-level chip. Basemap geography is real; zone footprints, populations and route status are sample data, and the map captions separate the two.
+
+**Known gap against that principle, as of this build:** the SAR change-detection screen's before/after slider (`frontend/src/components/BeforeAfterSlider.tsx`) carries only generic "BEFORE"/"AFTER" corner labels and the page-level `SAMPLE DATA` chip — no per-asset caption stating what the imagery actually is. That matters more here than elsewhere: the scene is not merely sample Dima Hasao data standing in for a real place, it's a **programmatically-generated synthetic texture** (NumPy noise plus an added patch) standing in for a satellite pass entirely — there is no real Sentinel-1 capture behind it at all (`docs/TRD.md` §8.3, `backend/app/cv/change_detection.py`). This is a real, live-app instance of the pattern rule 6 exists to prevent, not yet closed by an on-asset caption.
 
 **Designed for constrained connectivity.** Sync state, queue depth and unreviewed status are first-class interface elements, not status-bar afterthoughts. The field module shows its own network state, what is queued on device, and what happens on reconnect — including that a retried sync upserts on a client UUID and cannot create a duplicate.
 
@@ -178,6 +180,7 @@ Built and interactive in the prototype. Each maps to the functional requirement 
 | Field home — assigned queue and sync state | §7.10 |
 | Survey capture — four-step structured checklist, structure condition, photo and GPS geotag, offline/online capture | §7.10 |
 | Submission history — own submissions with review status | §7.10 |
+| Field officer logistics — the same relocation records the SDMA Logistics tracker shows, scoped by RLS to the officer's assigned zones, with assigned/in-transit/arrived status-advance actions | §7.6 |
 
 ### District control room
 

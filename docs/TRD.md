@@ -11,7 +11,6 @@
 | Department | National Disaster Response Force (NDRF), Disaster Management Division |
 | Category | Software |
 | Theme | Disaster Management |
-| Institution | Pillai University (PCACS), Panvel |
 | Companion document | Product Requirements Document (PRD), v1.1 — defines what and why; this document defines how |
 | Document Owner | Kasukabe Defense Coders |
 | Version | 1.0 |
@@ -66,11 +65,11 @@ Four decisions shape every choice in this document:
 
 ## 3. System Architecture
 
-The platform is a five-layer architecture: external data sources, an integration/ingestion layer, an application/service layer, a data layer, and a client layer, connected over a transport layer designed for constrained links (see Figure 1).
+The platform is a five-layer architecture: external data sources, an integration/ingestion layer, an application/service layer, a data layer, and a client layer, connected over a transport layer designed for constrained links (see Figure 1). **This section describes the full target design; §12 states plainly which of these layers actually exist as running code in the current pilot build versus which are architecture the codebase leaves room for.** As of this build, none of the ingestion connectors below are implemented — every external-source value on a zone (`susceptibility_score`, `gsi_classification`, incident history) is research findings encoded once as labeled sample data by `backend/app/seed.py`, and the forecasting model's "live" rainfall input is a jittered placeholder (§8.2), not a network call to any of these sources.
 
 **External government data sources.**
 
-IMD (rainfall/nowcast), CWC/Google Flood Forecasting API, GSI Bhusanket, INCOIS, NCCR, ISRO Bhuvan, and Sentinel SAR/optical imagery — consumed as-is, per PRD §8. The platform generates none of this data itself.
+IMD (rainfall/nowcast), CWC/Google Flood Forecasting API, GSI Bhusanket, INCOIS, NCCR, ISRO Bhuvan, and Sentinel SAR/optical imagery — the platform is designed to consume these as-is, per PRD §8, and generates none of this data itself. No connector to any of them is built yet (see the note above); the pilot's zone/incident data was hand-researched from several of these sources (`docs/BUILD-PLAN.md`, Phase 3 findings) and encoded as sample data, which is a one-time research step, not a live integration.
 
 **Integration & ingestion layer.**
 
@@ -82,7 +81,7 @@ One FastAPI app, one process, with a router per PRD functional requirement or cl
 
 **Data layer.**
 
-PostgreSQL + PostGIS as the system of record; object storage for imagery and survey photos; Redis for caching and live-feed buffering; an append-only audit log table for relocation decisions and priority rankings (PRD §10, auditability).
+PostgreSQL + PostGIS as the system of record; object storage for imagery and survey photos; Redis for caching and live-feed buffering; an append-only audit log table for relocation decisions and priority rankings (PRD §10, auditability). **As shipped:** PostGIS and the audit log are real and load-bearing. Object storage (MinIO) is genuinely wired, but only for change-detection imagery (`backend/app/storage.py`, used by `backend/app/services/change_detection.py`) — a submitted survey's `photo_url` is stored as a plain string reference from the sync payload; the field PWA's capture form (§9) doesn't currently include a photo/camera field, so nothing is actually uploaded to object storage for surveys yet. Redis is declared in configuration (`backend/app/config.py`) but has no calling code anywhere in the backend — no caching or live-feed buffering is implemented, since there is no live feed yet to buffer (§11's ingestion-layer note above).
 
 **Client layer.**
 
@@ -186,15 +185,26 @@ Features: terrain slope and aspect (derived from SRTM DEM via GDAL/rasterio), la
 
 ### 8.2 Predictive Risk Forecasting (72-Hour Rolling Score)
 
-Features: live rainfall (IMD), river-gauge levels (CWC/Google), cyclone/storm-surge indicators (INCOIS), each zone's static susceptibility baseline. Model: gradient-boosted trees (XGBoost) or a simple LSTM if time-series structure is needed, trained on historical hazard-event outcomes for the pilot district. Output: a score and a factors[] breakdown per zone, refreshed on each ingestion cycle, feeding the dashboard's forecast view (PRD §5).
+**Full design:** features drawn from live rainfall (IMD), river-gauge levels (CWC/Google), cyclone/storm-surge indicators (INCOIS), and each zone's static susceptibility baseline; refreshed on each ingestion cycle.
+
+**What's actually shipped** (`backend/app/ml/forecast_model.py`, `backend/app/services/forecasts.py`): a real, trained XGBoost regressor (not an LSTM — decided in §14) over exactly two features per zone — the seeded `susceptibility_score` (real, per Phase 3) and a `rainfall_72h_mm`/`slope_degrees` pair that is a **labeled placeholder**, not a live IMD/CWC pull: each "Generate forecast" click re-samples `rainfall_72h_mm` from a Gaussian jittered around a fixed per-zone baseline, simulating cycle-to-cycle variation without any external data source behind it. The model is trained on the prototype's own `forecastRow()` curves (rescaled 0–1), not on historical hazard-event outcomes — there wasn't a historical-outcomes dataset for the pilot district's specific zones to train on, so the prototype's already-agreed demo shape was used as the training target instead, and is labeled as such. What is genuinely real: the trained model itself, and per-prediction SHAP values (not global feature importances) as the `factors[]` array, so the number differs meaningfully prediction to prediction, not just cosmetically. `model_version` is stored as `"xgb-v1-placeholder-rainfall-slope"` precisely so this distinction survives into the data itself, not just this document.
+
+**Two real bugs found and fixed by hand-verifying this model in Docker** (not a documentation correction — application code changed):
+
+1. **The SHAP rescale that's supposed to make `factors[]` sum to the score didn't.** `predict_with_factors()` computed `scale = score / raw_prediction`, where `raw_prediction = base_value + shap_values.sum()` — but the SHAP identity is `sum(shap_values) = raw_prediction - base_value`, not `raw_prediction` itself, so the rescale was only correct when `base_value` happened to be 0 (it isn't — it's the model's mean training output, roughly 0.6–0.7). Running the trained model against all four seeded zones across all six horizons showed contributions summing to anywhere from a quarter of the actual score to the wrong sign entirely (e.g. ZN-01 at 72h: score `0.41`, factors summing to `-0.26`). Fixed to divide by `shap_values.sum()` directly; a regression test (`tests/test_forecasts.py`) now asserts the sum matches the score on every generation.
+2. **The seeded "72-hour" risk score for every zone was actually its 6-hour peak value.** `backend/app/seed.py`'s `zones.risk_score_72h` (0.88/0.81/0.76/0.54 for ZN-01–04) matched the training targets at the *6-hour* horizon exactly, not the 72-hour one (0.41/0.48/0.36/0.31) — confirmed by comparing against `forecast_model.py`'s own `TRAINING_TARGETS_PCT`. Every zone displayed roughly double its correct pre-generation risk figure, and clicking "Generate forecast" would have visibly halved the number — looking like a bug, when the seed data was the actual bug. Corrected in `seed.py`; `zones.risk_score_72h` now matches what the model itself predicts for that horizon to within its own small fit error.
+
+Because `risk_score_72h` is `prio_score`'s highest-weighted input (32%), fixing #2 changed the priority tier for 6 of the 11 seeded households — mostly `immediate` down to `short_term`, since the district's risk figures were inflated roughly 2x before the fix. `tests/test_scoring.py` and `tests/test_dashboard_api.py` were updated to the corrected, hand-reverified expected values; see those files' own comments for the before/after numbers.
 
 ### 8.3 Satellite/SAR Rapid Damage Detection
 
-Input: a before/after image pair (SAR preferred for cloud/night robustness). Baseline method: pixel-level differencing + thresholding on radar backscatter change; stretch goal: a Siamese U-Net trained on labeled change-detection datasets if time allows. Output: an affected-area polygon, cross-referenced against households/surveys to answer not just “where” but “who.” For the hackathon, this is demonstrated with one curated before/after pair rather than a live feed (PRD §12) — the pipeline code is real, the input is fixed.
+Input: a before/after image pair (SAR preferred for cloud/night robustness). Baseline method: pixel-level differencing + thresholding on radar backscatter change; stretch goal: a Siamese U-Net trained on labeled change-detection datasets if time allows. Output: an affected-area polygon, cross-referenced against households/surveys to answer not just “where” but “who.”
+
+**What's actually shipped, precisely.** `backend/app/cv/change_detection.py` implements the real pipeline described above — OpenCV `absdiff` differencing, Otsu thresholding, contour extraction, and pixel-to-lon/lat conversion — but `POST /zones/{id}/change-detections/run` does not run it against a Sentinel/Copernicus image pair, live or downloaded: sourcing an actual Sentinel-2 pair needs Copernicus/Sentinel Hub credentials this build doesn't have. Instead it runs the real pipeline against one **programmatically-generated synthetic pair** — a NumPy noise texture standing in for a "before" scene, then the same texture with an added high-reflectance patch standing in for a landslide scar in the "after" scene. This is a genuine, deliberate scope cut (the same class as Phase 3's GSI/IMD data and Phase 7's OSRM binary, `docs/BUILD-PLAN.md`), not an oversight: the CV *code path* is real and unmodified from what would run against real imagery, but the *input* is synthetic, not sourced from any satellite. Any doc or UI copy describing this as a "sample Sentinel-1 capture" or otherwise implying the pixels themselves come from a real satellite pass overstates what's shipped — see `docs/DESIGN-SYSTEM.md` §4/§6 for the corrected wording.
 
 **On feasibility and access.**
 
-The Sentinel/Copernicus imagery this component runs on is free and openly accessible to anyone, anywhere, with no government relationship, fee, or special permission required — including a student hackathon team. This is a deliberate reason Sentinel was chosen over ISRO's own satellite catalog for this component. What is not feasible for any hackathon team — not as a skill gap, but as a structural constraint — is a live, continuously-polling system that automatically detects change the moment a new satellite pass occurs; that requires production-scale cloud infrastructure watching global satellite feeds around the clock, which no team builds in a hackathon window. The distinction that matters when presenting this to judges: the algorithm and the imagery are both genuinely real and running; only the “triggers automatically, all the time” part is future/production scope.
+The Sentinel/Copernicus imagery this component is *designed* to run on is free and openly accessible to anyone, anywhere, with no government relationship, fee, or special permission required — including a student hackathon team; this is a deliberate reason Sentinel was chosen over ISRO's own satellite catalog for this component, and remains the right target once Sentinel Hub access is set up. What is not feasible for any hackathon team — not as a skill gap, but as a structural constraint — is a live, continuously-polling system that automatically detects change the moment a new satellite pass occurs; that requires production-scale cloud infrastructure watching global satellite feeds around the clock, which no team builds in a hackathon window. The honest framing for judges: the *algorithm* is genuinely real and running against a labeled-synthetic input; a real Sentinel pair and the "triggers automatically, all the time" capability are both still future/pilot scope, not just the latter.
 
 ### 8.4 Retraining Loop
 
@@ -241,9 +251,21 @@ Per PRD §10, household-level vulnerability data is sensitive and access must be
 
 ## 11. Deployment Architecture
 
-**Hackathon demo:**
+**Local development:**
 
-Docker Compose on a single host — the frontend, one consolidated FastAPI app with routers (§3, §14 decision 1), Postgres+PostGIS, Redis, MinIO, and a self-hosted OSRM instance pre-built for the Dima Hasao road network extract.
+Docker Compose on a single host — the frontend, one consolidated FastAPI app with routers (§3, §14 decision 1), Postgres+PostGIS, Redis, MinIO, and a self-hosted OSRM instance pre-built for the Dima Hasao road network extract. This is what `docker compose up -d` (README) stands up; it's the environment every phase in `docs/BUILD-PLAN.md` was built and tested against.
+
+**Live pilot deployment.**
+
+The same backend and both frontends are also deployed as three separate, independently-hosted services, for judges/reviewers to reach without running anything locally:
+
+- **Backend (Railway):** the root-level `Dockerfile` (a plain `python:3.11-slim` image installing `backend/requirements.txt`, distinct from `backend/Dockerfile`'s docker-compose-scoped build context) builds the FastAPI app; `railway.json` points Railway at it and sets the start command to `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`, so every deploy migrates the database before serving traffic rather than requiring a manual migration step. Railway supplies its own managed Postgres (PostGIS-enabled) and injects `DATABASE_URL`/`MIGRATION_DATABASE_URL` as plain `postgresql://` URLs; `Settings._normalize_db_url` (`backend/app/config.py`) rewrites either that or a bare `postgres://` scheme to `postgresql+psycopg://` so SQLAlchemy doesn't fall back to the unavailable psycopg2 driver. Redis, MinIO and OSRM are not part of this deployment — see the gaps note below.
+- **Dashboard (Vercel):** `frontend/vercel.json` pins the Vite build (`npm install && npm run build`, `dist/` as the output directory) for the SDMA official / field officer / control room / shelter officer dashboard, deployed as its own Vercel project rooted at `frontend/`.
+- **Field survey PWA (Vercel):** `frontend-field/vercel.json` does the same for the standalone field-survey app, deployed as a second, separate Vercel project rooted at `frontend-field/`.
+- **Cross-origin wiring:** the backend's CORS middleware (`backend/app/main.py`) always allows the local Vite dev origins, plus whatever is listed in `CORS_ALLOWED_ORIGINS` — a comma-separated Railway environment variable holding the two Vercel deployment URLs (trailing slashes stripped, since a browser's `Origin` header never carries one). Pointing either frontend at a new deployment URL is a Railway env var change, not a code change.
+- **Database ownership on a managed provider:** migration `0002`'s `app_user` role creation originally hardcoded `GRANT/REVOKE ... ON DATABASE ps191`, which is correct for the local Compose database name but not for a managed provider's own default (Railway's is `railway`, not `ps191`); it now resolves the database name dynamically via `current_database()` so the same migration runs unmodified on either.
+
+**Known gaps in the live pilot deployment** (all “designed for, not built” in this specific environment, distinct from the production gaps below): no Redis instance is provisioned, so the caching/live-feed-buffering role §3/§4 describe is unused at this stage; no MinIO/S3 bucket is wired in, so `photo_url`/`before_image_ref`/`after_image_ref` remain references without a live object store behind them in this deployment; and no OSRM instance is deployed, matching the gap already recorded in `docs/BUILD-PLAN.md` Phase 7 (the `routes` API, GeoJSON storage and blocked-segment layer are real; the routing engine itself is not stood up anywhere yet, local or hosted).
 
 **Designed for, not built — production:**
 
@@ -255,11 +277,13 @@ Mirroring PRD §6:
 
 **Built for the hackathon demo:**
 
-Zone & Red-Zone Service with real GSI + published Dima Hasao susceptibility research + live IMD rainfall polling; Vulnerability & Priority Engine and Shelter & Allocation Engine over seeded household/shelter data; Field Survey PWA with simulated offline capture; Central Dashboard with landing/summary screen; susceptibility-refinement and forecasting models trained on available historical data for the pilot district; change detection demonstrated on one curated before/after image pair.
+Zone & Red-Zone Service with real GSI classification research + published Dima Hasao susceptibility research, encoded as labeled sample data per zone (§6, §8.1 — not live-polled); Vulnerability & Priority Engine and Shelter & Allocation Engine over seeded household/shelter data; Field Survey PWA with simulated offline capture; Central Dashboard with landing/summary screen; a real XGBoost forecasting model with genuine per-prediction SHAP factors, trained on the pilot district's seeded susceptibility values against a placeholder rainfall/slope feature that's jittered per generation cycle rather than pulled from live IMD/CWC telemetry (§8.2); change detection running the real OpenCV differencing/thresholding/contour pipeline against one programmatically-generated synthetic before/after pair, not a real satellite image (§8.3).
 
 **Designed for, not built for the demo:**
 
 production-scale polling of IMD/Google/INCOIS APIs (the demo uses CWC/data.gov.in historical data as the flood signal, not Google's waitlisted live API — §6); true offline sync tested over an actual constrained link; NDMS VSAT integration (a compatibility target, not something the team requests access to — §9); push integration into Sachet; live interagency system-to-system handoff (7.13 stays a status flag + log for the MVP); continuously-polling live satellite change detection (§8.3 — no hackathon team builds this; the demo runs the real algorithm on one real, pre-downloaded image pair).
+
+**Load/Reset Demo Data.** Every screen in the live pilot reads from seeded rows (`backend/app/seed.py`), all carrying the `SAMPLE DATA` marker per CLAUDE.md rule 6. Signed in as `sdma_official`, the "Reset demo data" control in the dashboard's shared header (`frontend/src/components/Layout.tsx`) calls `POST /demo/seed-relocations` (`sdma_official`-only), which runs a full tear-down-and-reseed rather than a seed-once no-op — a judge re-running the demo mid-session always gets the same fresh scenario, not whatever state the last click or a field officer's own testing left behind. One call: deletes every `relocation_record` and `survey` (and their dependents — `handoff_logs`/`incident_outcomes` rows FK'd to a relocation, deleted first since neither FK carries an `ON DELETE` clause); resets `vehicles.status` to `available` and `shelters.current_occupancy`/`zones.risk_score_72h` to their seeded baseline (the fields their own lifecycles mutate in place); then reseeds a fixed scenario — 5 buses carrying all 11 seeded households across varying relocation stages, and 8 re-verification surveys (half reviewed, half not) — through the real allocation/status/review services, so the reseeded rows carry genuine `factors[]` snapshots and `audit_log` entries rather than raw inserts. `audit_log` itself is never touched: it has no `UPDATE`/`DELETE` grant for any application role (rule 2), so a past demo run's audit trail survives every reset. `districts`/`zones`/`households`/`shelters`/`vehicles`/`users` rows themselves are never recreated by this endpoint — only `backend/app/seed.py` (run once, at initial setup) creates those. See `docs/BUILD-PLAN.md` Phase 6 and `backend/app/services/demo_seed.py` for the full mechanism.
 
 ## 13. Assumptions, Constraints & Risks (Technical)
 

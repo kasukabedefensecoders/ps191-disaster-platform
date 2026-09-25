@@ -111,7 +111,7 @@ Numbering is dependency order, not calendar time — no hackathon duration was g
 
 - Users/roles, OAuth2 password flow + JWT, per-connection `app.current_role`/`app.current_user_id` middleware.
 - RLS policies on `households`, `surveys`, `zones` (rule 7).
-- Seed data ported directly from the prototype's static arrays: `districts` (Dima Hasao only), `zones` ZN-01…ZN-08, `households` HH-112 etc., `shelters` SH-01 etc. — same IDs, same values, so the Python scoring port can be checked against the prototype's own numbers.
+- Seed data ported directly from the prototype's static arrays: `districts` (Dima Hasao only), `zones`, `households` HH-112 etc., `shelters` SH-01 etc. — same IDs, same values, so the Python scoring port can be checked against the prototype's own numbers. **Correction (see Phase 3 below):** only 4 of the prototype's 8 zones (`ZN-01`…`ZN-04`) were actually carried into `backend/app/seed.py`; the other 4 were never ported.
 
 **Risk:** RLS is easy to get subtly wrong under time pressure and is exactly the kind of bug (rule 7: "a missed `WHERE` clause... must not be able to leak household vulnerability data") that doesn't show up in a demo but matters most. Write a test that logs in as `field_officer` and confirms a household outside their assigned zones returns nothing, before building anything on top — not as cleanup at the end.
 
@@ -127,13 +127,13 @@ Port `vulnFactors`/`vulnScore`/`prioFactors`/`prioScore`/`prioTier`/`matchFactor
 
 - Zone CRUD, `GET /zones` (paginated, `since`-aware), zone detail with incident history and the new GSI-vs-ML divergence fields (§2.2).
 - Reuse `PROTOTYPE/dima-hasao-map.html`'s Leaflet setup nearly as-is for the dashboard map.
-- Sourcing real GSI Bhusanket classification + the published Dima Hasao susceptibility research + IMD historical rainfall baseline for the 8 zones is a **research task, not a coding task** — start it in parallel with Phase 2, don't sequence it after. Time-box it; fall back to clearly-marked `SAMPLE DATA` (rule 6) rather than let sourcing real figures block the schedule.
+- Sourcing real GSI Bhusanket classification + the published Dima Hasao susceptibility research + IMD historical rainfall baseline for the seeded zones is a **research task, not a coding task** — start it in parallel with Phase 2, don't sequence it after. Time-box it; fall back to clearly-marked `SAMPLE DATA` (rule 6) rather than let sourcing real figures block the schedule.
 
 **Risk:** IMD's public API access terms are unconfirmed (TRD §12/§13). Per scope discipline, the MVP's "live" IMD signal should be built against the historical baseline path from day one — don't build a hard dependency on live IMD access materializing in time.
 
 **Phase 3 data-sourcing findings (research task, completed):**
 
-The demo's 8 zones (`Upper Ridge`, `Riverbend East`, `Slate Quarry`, `Mill Colony`, `Terrace Block`, `North Spur`, `Canal Fringe`, `Pine Hollow`) are synthetic constructs invented for the prototype — they are not real GSI-mapped locations, so no source gives a real classification for *them specifically*. What's real, and what isn't, breaks down as follows:
+The prototype's 8 zones (`Upper Ridge`, `Riverbend East`, `Slate Quarry`, `Mill Colony`, `Terrace Block`, `North Spur`, `Canal Fringe`, `Pine Hollow`) are synthetic constructs invented for the prototype — they are not real GSI-mapped locations, so no source gives a real classification for *them specifically*. **Only the first 4 (`ZN-01`–`ZN-04`: Upper Ridge, Riverbend East, Slate Quarry, Mill Colony) were actually carried into `backend/app/seed.py`** — this is what the live build's zone count, dashboard figures, and every downstream count in this document (11 households, 5 shelters, etc.) are built against; `Terrace Block`/`North Spur`/`Canal Fringe`/`Pine Hollow` exist only in the prototype reference and were never ported. What's real, and what isn't, about the 4 zones that were seeded breaks down as follows:
 
 - **GSI Bhusanket** ([bhusanket.gsi.gov.in](https://bhusanket.gsi.gov.in/LS_hazard.html)) is a real, public GSI portal, but its Landslide Hazard page exposes no downloadable classification data or API — only that GSI's National Landslide Susceptibility Mapping programme uses "a semi-quantitative heuristic method per BIS guidelines" at 1:50,000 scale. No district-level GSI figures are accessible programmatically. Separately confirmed real: ASDMA signed an MoU with GSI in August 2024 to pilot a regional Landslide Early Warning System in Dima Hasao and Cachar specifically — Dima Hasao is a genuine GSI priority district, just not one with a public downloadable zonation yet.
 - **The published susceptibility research TRD §8 cites is real, not fabricated** — verified: Kumar et al., *"Geospatial modelling of landslide susceptibility using modified frequency ratio, weight of evidence, and Shannon entropy: a case study in Dima Hasao district,"* Proc. Indian National Science Academy (2026), [10.1007/s43538-026-00815-w](https://link.springer.com/article/10.1007/s43538-026-00815-w). Full text is paywalled, so exact per-class area percentages weren't extractable, but the abstract confirms the frequency-ratio model performed best (success rate 0.734) and that **central and eastern Dima Hasao fall in "very high" susceptibility** — loosely consistent with, but not the source of, our sample zones' high `susceptibility_score` values, which remain sample data.
@@ -148,9 +148,11 @@ Wire Phase 2's `vulnScore`/`prioScore`/`prioTier` into `GET /zones/{id}/househol
 
 ### Phase 5 — Shelter allocation (7.4, 7.5) (S) — depends on Phase 2
 
-Shelter CRUD with the `current_occupancy <= max_capacity` check already in the schema; matching endpoint wired to `matchFactors`/`matchScore`.
+Shelter CRUD with the `current_occupancy <= max_capacity` check already in the schema; matching endpoint wired to `matchFactors`/`matchScore`. Distance is a real PostGIS `ST_DistanceSphere` straight-line proxy over actual seeded geometry (§7's "designed for, not built" — real routing is Phase 7).
 
 **Migration `0004`** later added a `standby` shelter status plus `contact_name`/`contact_phone`/`needs` columns, so the shelter officer dashboard has a real point of contact and a running needs list to show, not just occupancy — see Backend Schema §5.5.
+
+**Found on later verification, worth flagging here rather than only in Backend Schema §5.4:** every household in a zone was seeded with that zone's centroid as its `geom`, not a distinct point — so this real distance calculation currently produces the same `distance_km`/`match_score` for every household in a given zone against a given shelter, not a genuinely household-specific number. `backend/tests/test_scoring.py`'s HH-112→SH-01 test (`distance_km=4.2`, expecting `match_score=0.90`) reflects the *prototype's* static mock figures for that pair, not what the live endpoint returns today (real seeded distance ≈1.1 km, live score ≈0.95) — the test still correctly verifies the pure scoring function, but its own comment overstates what those specific numbers represent in this build. See Backend Schema §5.4 for the full note.
 
 ### Phase 6 — Logistics tracking (7.6) (M) — depends on Phase 5
 
@@ -178,11 +180,20 @@ Survey capture form, IndexedDB/Dexie offline queue, sync endpoint doing `insert 
 
 **Risk:** the idempotent-upsert-on-retry behavior (rule 5) is easy to get right in the happy path and wrong under an actual retried failure — test with a simulated dropped connection mid-sync, not just a clean submit.
 
+**Found and fixed on later hand-verification (a real field officer session against the deployed field PWA, not a code read):** every sync attempt failed unconditionally with `duplicate key value violates unique constraint "surveys_display_code_key"`, on every retry, not intermittently. Root cause: `next_display_code()` (`services/display_codes.py`) computed the "next" `SV-`/`HH-` number by scanning existing display codes through the caller's own request-scoped `db` session — the same session RLS applies to. A `field_officer`'s view of `surveys`/`households` is scoped to their assigned zones, so the scan systematically undercounted the true district-wide max and recomputed a code that already existed in a zone outside their assignment — on this seeded data, a field officer assigned to ZN-01/ZN-03 only sees `SV-1,2,5,6` and computes `SV-7` next, which already exists in ZN-04. Not a race condition (though the old approach was independently vulnerable to one too) — deterministic, and it broke the core field-survey submission workflow (PRD §7.10) for the exact seeded demo scenario. **Migration `0008`** replaces the scan with a real Postgres sequence per prefix (`SV`, `HH`, `HO`, `MV`, `RT` — the five prefixes that were ever auto-generated rather than caller-supplied) — sequences are schema objects, not subject to RLS, and `nextval()` is atomic regardless of concurrent callers or uncommitted rows in the same transaction, so it has neither failure mode. Verified by reproducing the exact live precondition in Docker (reset demo data, then sync as the field officer) and confirming the previously-failing request now succeeds; `tests/test_survey_sync.py` carries a permanent regression test for it.
+
 ### Phase 10 — Predictive risk forecasting (7.9) (M) — depends on Phase 3's historical rainfall baseline
 
 XGBoost/regression 72h score with `factors[]`, one `risk_forecasts` row per zone per horizon bucket per generation cycle (not one row holding all six buckets — that's a modeling difference from the prototype's `forecastRow()` worth noting explicitly, since it changes how the ingestion job writes results). Per TRD §14, default to XGBoost over an LSTM for explainability and time.
 
 **Migration `0007`** granted `app_user` a narrowly-scoped `DELETE` on `risk_forecasts`, so the Phase 6 demo-reset flow can clear stale forecast rows on each reseed the same way it already clears `relocation_records`/`surveys` — see Backend Schema §7.
+
+**Found and fixed on later hand-verification (Docker, real xgboost/shap — not a doc correction, actual code changed):**
+
+1. `ml/forecast_model.py`'s SHAP-to-score rescale divided by `base_value + shap_values.sum()` instead of `shap_values.sum()` alone, so `factors[]` contributions didn't actually sum to the score — rule 1 broken for this one endpoint despite the code's own comment claiming otherwise. Confirmed by running the trained model against all 4 seeded zones × 6 horizons in the real backend image: contributions ranged from a quarter of the score to the wrong sign. One-line fix; `tests/test_forecasts.py` now asserts the sum on every generation so this can't silently regress.
+2. `seed.py`'s `zones.risk_score_72h` for all 4 zones was the prototype's *6-hour* peak value, not its 72-hour value — an exact match to `TRAINING_TARGETS_PCT[...][0]` for all four zones confirmed this wasn't noise. Corrected to the real 72h targets (0.41/0.48/0.36/0.31). Since this is `prio_score`'s highest-weighted input, the fix moved 6 of 11 seeded households down a priority tier — `tests/test_scoring.py` and `tests/test_dashboard_api.py` carry the corrected, hand-reverified expectations. See `docs/TRD.md` §8.2 for the full account.
+
+This is exactly the class of bug Part 3's testing requirement (§1.2) exists to catch — verified by hand against a real trained model, not by trusting that a well-shaped `factors[]` array meant the numbers were right.
 
 ### Phase 11 — Change detection (7.11) (S) — fully independent; good early pickup
 
@@ -195,6 +206,17 @@ CV differencing/thresholding on one curated before/after Sentinel pair. Zero dep
 ### Phase 13 — Post-incident feedback screen (7.12) (stretch only)
 
 The `incident_outcomes` table already exists from Phase 0. Per CLAUDE.md, build the screen only if the core loop (Phases 1–9) is genuinely done with time to spare — don't let it displace any phase above it.
+
+### Phase 14 — Pilot deployment (Vercel + Railway) (S) — depends on Phases 1–9 being demoable
+
+Everything through Phase 13 had only ever run under Docker Compose on one host. This phase puts the same build in front of judges/reviewers as three separately-hosted services, without changing any application behavior — every fix below was a deployment-config or environment-portability bug, not a feature change.
+
+- **Backend on Railway.** `railway.json` added, pointing at a new root-level `Dockerfile` (a plain `python:3.11-slim` image installing `backend/requirements.txt` — `backend/Dockerfile`'s own build context is scoped to `backend/` for docker-compose and doesn't match Railway's full-repo build). First attempt shipped with no `dockerfilePath` set, so Railway's default Dockerfile lookup at the repo root found nothing; fixed by adding the path explicitly. The start command runs `alembic upgrade head` before `uvicorn`, so a deploy migrates the database itself rather than needing a manual step afterward.
+- **Managed Postgres portability.** Railway hands out a plain `postgresql://` URL and a database not named `ps191` (its own default is `railway`). Two separate bugs followed from assuming otherwise: `Settings` didn't rewrite `postgres://`/`postgresql://` to the `postgresql+psycopg://` scheme SQLAlchemy needs (psycopg2 isn't installed — only `psycopg[binary]`), and migration `0002`'s `GRANT/REVOKE ... ON DATABASE ps191` hardcoded the local Compose database name, which silently rolled back the entire migration — including the `app_user` role creation sharing that transaction — on any database with a different name. Both are fixed in `backend/app/config.py` (dynamic scheme rewrite) and `0002_display_codes_app_user_rls.py` (resolves the name via `current_database()` instead).
+- **Dashboard and field PWA on Vercel.** `frontend/vercel.json` and `frontend-field/vercel.json` each pin the Vite build (`npm install && npm run build`, `dist/` output) so the two frontends deploy as separate Vercel projects rooted at `frontend/` and `frontend-field/` respectively.
+- **CORS made configurable.** The backend previously allowed only the two local Vite dev origins (already flagged in its own code comment as "revisit before any real deployment" — see git history). `CORS_ALLOWED_ORIGINS`, a comma-separated Railway environment variable, now supplies the production origins (the two Vercel URLs) alongside the dev ones, with trailing slashes stripped since a browser's `Origin` header never carries one. Pointing either frontend at a new deployment is now an env var change, not a code change.
+
+**Risk, resolved:** every bug in this phase (missing Dockerfile path, no migration-on-boot, hardcoded DB driver scheme, hardcoded DB name, hardcoded CORS origins) is a "works on my machine" class of gap that Docker Compose alone would never surface, because Compose always supplies a `postgresql+psycopg://` URL to a database actually named `ps191`. Confirms TRD §13's general point about not hard-depending on one environment's assumptions, just for infrastructure rather than an external API this time.
 
 ---
 

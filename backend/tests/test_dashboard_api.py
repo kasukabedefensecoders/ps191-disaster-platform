@@ -30,10 +30,13 @@ def test_sdma_official_sees_full_summary(client):
     # descending priority order across the whole district
     scores = [h["priority_score"] for h in body["top_priority_households"]]
     assert scores == sorted(scores, reverse=True)
-    # HH-112 is the highest hand-verified priority_score across all 11
-    # seeded households (test_scoring.py's EXPECTED table: 0.86)
-    assert top["display_code"] == "HH-112"
-    assert scores[0] == 0.86
+    # HH-203 is the highest hand-verified priority_score across all 11
+    # seeded households (test_scoring.py's EXPECTED table: 0.74) — after the
+    # zones.risk_score_72h seed-data correction (see test_scoring.py's module
+    # docstring), HH-112's zone (ZN-01) no longer has the highest risk input,
+    # so it no longer edges out HH-203's zone (ZN-02) on this factor.
+    assert top["display_code"] == "HH-203"
+    assert scores[0] == 0.74
 
 
 def test_field_officer_sees_only_their_zones_in_summary(client):

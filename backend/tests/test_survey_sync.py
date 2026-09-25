@@ -227,6 +227,51 @@ def test_sync_for_zone_outside_officers_assignment_is_reported_as_error_not_500(
     assert len(response.json()["errors"]) == 1
 
 
+def test_new_survey_code_does_not_collide_with_a_code_outside_officers_rls_view(client, admin_db):
+    """Regression test for a real bug found by hand-verifying the deployed
+    field PWA: next_display_code() used to scan existing display_codes
+    through the caller's own RLS-scoped session, so a field_officer's
+    restricted view of `surveys` (their assigned zones only) silently
+    undercounted the true max and could compute a "next" code that already
+    exists in a zone outside their assignment — an unconditional,
+    deterministic sync failure (`duplicate key value violates unique
+    constraint "surveys_display_code_key"`), not an edge case. Fixed by
+    migration 0008 (a real Postgres sequence, immune to RLS). This test
+    manufactures exactly that precondition: a survey in ZN-02 (outside this
+    officer's ZN-01/ZN-03 assignment) whose code the old scan-based
+    implementation would have recomputed and collided with."""
+    officer_headers = _auth_headers(client, "field.officer@ps191.dev")
+    sdma_headers = _auth_headers(client, "sdma.official@ps191.dev")
+    zn01_id = _zone_id(client, officer_headers, "ZN-01")
+    zn02_id = _zone_id(client, sdma_headers, "ZN-02")  # not assigned to this officer
+
+    next_code = admin_db.execute(text("select 'SV-' || nextval('display_code_seq_sv')")).scalar()
+    hidden_survey_id = str(uuid.uuid4())
+    admin_db.execute(
+        text(
+            "insert into surveys (survey_id, display_code, zone_id, officer_id, submitted_at, payload, review_status) "
+            "select :sid, :code, :zone_id, user_id, now(), '{}'::jsonb, 'unreviewed' from users where role = 'sdma_official' limit 1"
+        ),
+        {"sid": hidden_survey_id, "code": next_code, "zone_id": zn02_id},
+    )
+    admin_db.commit()
+
+    survey_id = str(uuid.uuid4())
+    item = _payload_item(survey_id, zn01_id, household_id=None, geotag={"type": "Point", "coordinates": [93.02, 25.16]})
+
+    response = client.post("/surveys/sync", headers=officer_headers, json={"surveys": [item]})
+    try:
+        assert response.json()["errors"] == [], response.json()
+        assert response.status_code == 200
+        assert response.json()["synced"][0]["survey_display_code"] != next_code
+    finally:
+        new_id = response.json()["synced"][0]["household_id"] if response.json()["synced"] else None
+        admin_db.execute(text("delete from surveys where survey_id in (:a, :b)"), {"a": survey_id, "b": hidden_survey_id})
+        if new_id:
+            admin_db.execute(text("delete from households where household_id = :id"), {"id": new_id})
+        admin_db.commit()
+
+
 def test_only_sdma_official_can_review_surveys(client, admin_db):
     officer_headers = _auth_headers(client, "field.officer@ps191.dev")
     zone_id = _zone_id(client, officer_headers, "ZN-01")

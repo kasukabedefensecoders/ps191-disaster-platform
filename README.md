@@ -6,6 +6,16 @@ An authority-only decision and coordination layer for disaster relocation: which
 
 Full requirements, architecture, schema and design docs live in [`docs/`](docs/). Contributor instructions (repo layout, stack, non-negotiable rules) live in [`CLAUDE.md`](CLAUDE.md) — read that before making changes.
 
+## Live deployment
+
+The pilot build also runs as three separately-hosted services (see [`docs/TRD.md`](docs/TRD.md) §11 for how) — no local setup needed to look at it:
+
+- **Backend API (Railway):** https://ps191-disaster-platform-production.up.railway.app/docs
+- **Main app** — SDMA official / field officer / shelter officer / control room dashboards (Vercel): https://ps191-disaster-platform.vercel.app
+- **Field survey PWA** (Vercel): https://ps191-field-app.vercel.app
+
+This deployment has no Redis, MinIO or OSRM instance behind it (see TRD §11's "known gaps" note) — routing, object storage and live-feed caching remain local-Compose-only for now.
+
 ## Stack
 
 - **Backend:** Python 3.11, FastAPI, PostgreSQL 15 + PostGIS 3, Alembic, Redis, MinIO.
@@ -66,6 +76,6 @@ Safe to click repeatedly — each call fully resets before reseeding, so a judge
 docker compose exec backend python -m pytest
 ```
 
-## Known conflicts between the backend schema and the prototype
+## Resolved conflicts between the backend schema and the prototype
 
-The Backend Schema and the original Claude Design prototype disagree on four enum shapes (priority tier values, score ranges, structural condition labels, survey review status). These are tracked and require a decision before being changed — see [`CLAUDE.md`](CLAUDE.md#known-conflicts--resolve-before-building-do-not-guess).
+The Backend Schema and the original Claude Design prototype originally disagreed on four enum shapes (priority tier values, score ranges, structural condition labels, survey review status). These were resolved in Phase 0 and have shipped ever since — `docs/BACKEND-SCHEMA.md` and `backend/app/models/enums.py` agree with each other on all four. See [`CLAUDE.md`](CLAUDE.md#resolved-conflicts--do-not-re-litigate) for the resolved values and [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) Part 1 for the reasoning behind each.

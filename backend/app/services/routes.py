@@ -51,7 +51,7 @@ def get_route(db: Session, route_id) -> RouteOut | None:
 def _next_route_code(db: Session) -> str:
     from .display_codes import next_display_code
 
-    return next_display_code(db, "RT", Route.display_code)
+    return next_display_code(db, "RT")
 
 
 def create_route(db: Session, payload: RouteCreate) -> RouteOut:

@@ -99,14 +99,17 @@ def predict_with_factors(susceptibility_score: float, rainfall_72h_mm: float, sl
     score = min(1.0, max(0.0, score))
 
     shap_values = explainer.shap_values(row)[0]
-    base_value = float(explainer.expected_value)
-    raw_prediction = base_value + float(shap_values.sum())
+    shap_sum = float(shap_values.sum())
 
-    # SHAP values sum to (raw_prediction - base_value); rescale so the
-    # factors' contributions sum to the actual (clipped) score, keeping
-    # rule 1's "factors travel with the score" contract exact even where
-    # clipping to [0,1] pulled the final score away from the raw sum.
-    scale = score / raw_prediction if raw_prediction not in (0, None) and abs(raw_prediction) > 1e-9 else 0.0
+    # shap_values sum to (raw_prediction - base_value), not to raw_prediction
+    # itself — so the rescale that makes contributions sum to the actual
+    # (clipped) score has to divide by shap_sum, not by base_value + shap_sum.
+    # (An earlier version of this divided by the latter, which is only
+    # correct when base_value happens to be 0; it isn't, so that version's
+    # contributions didn't actually sum to the score — sometimes not even in
+    # the right direction. Verified by hand against a real trained model,
+    # see docs/BUILD-PLAN.md's Phase 10 correction note.)
+    scale = score / shap_sum if abs(shap_sum) > 1e-9 else 0.0
     input_values = dict(zip(FEATURE_NAMES, row[0].tolist()))
 
     # `weight` here means something different from vuln/prio/match's static,
