@@ -19,6 +19,12 @@ class Route(Base):
     # per-zone list; every route now represents one zone's path to its
     # nearest eligible shelter, not an unscoped named route.
     zone_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("zones.zone_id"), nullable=False)
+    # The shelter this route actually leads to — added in migration 0013.
+    # Before this, "which shelter does this route go to" was only ever
+    # implicit in dest_geom's raw coordinates (not even reliably so: RT-07's
+    # dest_geom is wherever its fetched OSM segment happens to end, not
+    # SH-01's own point), so there was no way to show it in the UI at all.
+    shelter_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("shelters.shelter_id"), nullable=False)
     origin_geom = mapped_column(Geometry(geometry_type="POINT", srid=4326), nullable=False)
     dest_geom = mapped_column(Geometry(geometry_type="POINT", srid=4326), nullable=False)
     path = mapped_column(Geometry(geometry_type="LINESTRING", srid=4326), nullable=False)

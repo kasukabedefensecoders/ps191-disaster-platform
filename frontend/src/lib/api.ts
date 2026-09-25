@@ -143,6 +143,7 @@ export interface RouteRecord {
   route_id: string;
   display_code: string | null;
   zone_id: string;
+  shelter_id: string;
   origin_geom: GeoJSONPoint;
   dest_geom: GeoJSONPoint;
   path: GeoJSONLineString;

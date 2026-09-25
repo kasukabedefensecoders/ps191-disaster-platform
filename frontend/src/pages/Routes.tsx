@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import RouteMap from "../components/RouteMap";
 import { SampleDataBadge } from "../components/badges";
-import { addBlockedSegment, clearBlockedSegments, fetchRoutes, fetchZones, type RouteRecord, type Zone } from "../lib/api";
+import { addBlockedSegment, clearBlockedSegments, fetchRoutes, fetchShelters, fetchZones, type RouteRecord, type Shelter, type Zone } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { useTheme } from "../lib/ThemeContext";
 
@@ -11,6 +11,7 @@ export default function RoutesPage() {
   const { theme } = useTheme();
   const [routes, setRoutes] = useState<RouteRecord[] | null>(null);
   const [zonesById, setZonesById] = useState<Record<string, Zone>>({});
+  const [sheltersById, setSheltersById] = useState<Record<string, Shelter>>({});
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reasonDraft, setReasonDraft] = useState<Record<string, string>>({});
@@ -22,6 +23,9 @@ export default function RoutesPage() {
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
     fetchZones(token)
       .then((r) => setZonesById(Object.fromEntries(r.items.map((z) => [z.zone_id, z]))))
+      .catch(() => {});
+    fetchShelters(token)
+      .then((r) => setSheltersById(Object.fromEntries(r.items.map((s) => [s.shelter_id, s]))))
       .catch(() => {});
   };
 
@@ -75,6 +79,7 @@ export default function RoutesPage() {
           .map((r) => {
           const blocked = r.blocked_segments.length > 0;
           const zone = zonesById[r.zone_id];
+          const shelter = sheltersById[r.shelter_id];
           return (
             <div key={r.route_id} className="ps-card-hover" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 6, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -86,6 +91,11 @@ export default function RoutesPage() {
               {zone && (
                 <div style={{ fontSize: 11, color: "var(--ink4)" }}>
                   For {zone.display_code} · {zone.name}
+                </div>
+              )}
+              {shelter && (
+                <div style={{ fontFamily: "var(--font-data)", fontSize: 12, color: "var(--ink2)" }}>
+                  → {shelter.display_code} · {shelter.name}
                 </div>
               )}
               <div style={{ fontFamily: "var(--font-data)", fontSize: 12, color: "var(--ink3)" }}>

@@ -306,6 +306,7 @@ def seed() -> None:
             )
             db.add(household)
 
+        shelters_by_code: dict[str, Shelter] = {}
         for code, name, max_capacity, current_occupancy, facilities, (lon, lat), status, contact_name, contact_phone, needs in SHELTERS:
             shelter = Shelter(
                 shelter_id=uuid.uuid4(),
@@ -322,6 +323,7 @@ def seed() -> None:
                 needs=needs,
             )
             db.add(shelter)
+            shelters_by_code[code] = shelter
         db.flush()
 
         for display_code, vehicle_type, capacity, route_label in VEHICLES:
@@ -346,6 +348,7 @@ def seed() -> None:
                 route_id=uuid.uuid4(),
                 display_code="RT-07",
                 zone_id=zones_by_code["ZN-01"].zone_id,
+                shelter_id=shelters_by_code["SH-01"].shelter_id,
                 origin_geom=_point(origin_lon, origin_lat),
                 dest_geom=_point(dest_lon, dest_lat),
                 path=_linestring(RT07_PATH_COORDS),
@@ -356,13 +359,14 @@ def seed() -> None:
 
         for i, zone_code in enumerate(("ZN-02", "ZN-03", "ZN-04"), start=2):
             zone_lon, zone_lat = ZONE_CENTROIDS[zone_code]
-            _shelter_code, shelter_lon, shelter_lat, distance_km = _nearest_shelter(zone_lon, zone_lat)
+            shelter_code, shelter_lon, shelter_lat, distance_km = _nearest_shelter(zone_lon, zone_lat)
             duration_minutes = round(distance_km / ASSUMED_AVG_SPEED_KMH * 60)
             db.add(
                 Route(
                     route_id=uuid.uuid4(),
                     display_code=f"RT-0{i}",
                     zone_id=zones_by_code[zone_code].zone_id,
+                    shelter_id=shelters_by_code[shelter_code].shelter_id,
                     origin_geom=_point(zone_lon, zone_lat),
                     dest_geom=_point(shelter_lon, shelter_lat),
                     path=_linestring([(zone_lon, zone_lat), (shelter_lon, shelter_lat)]),

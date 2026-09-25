@@ -23,26 +23,31 @@ def test_field_officer_sees_seeded_route_no_rls(client):
     body = response.json()
     assert body["count"] == 4
 
-    # zones are RLS-scoped per role (field.officer only sees ZN-01/ZN-03) —
-    # routes aren't, so the zone lookup needs the full-visibility role.
+    # zones/shelters are RLS-scoped per role (field.officer only sees
+    # ZN-01/ZN-03) — routes/shelters aren't, so these lookups need the
+    # full-visibility role.
     sdma_headers = _auth_headers(client, "sdma.official@ps191.dev")
     zones = {z["display_code"]: z["zone_id"] for z in client.get("/zones", headers=sdma_headers, params={"limit": 200}).json()["items"]}
+    shelters = {s["display_code"]: s["shelter_id"] for s in client.get("/shelters", headers=sdma_headers, params={"limit": 200}).json()["items"]}
     by_code = {r["display_code"]: r for r in body["items"]}
     assert set(by_code) == {"RT-07", "RT-02", "RT-03", "RT-04"}
 
     rt07 = by_code["RT-07"]
     assert rt07["zone_id"] == zones["ZN-01"]
+    assert rt07["shelter_id"] == shelters["SH-01"]  # prototype's own "RT-07 · Upper Ridge -> SH-01"
     assert rt07["path"]["type"] == "LineString"
     assert len(rt07["path"]["coordinates"]) > 40  # real OSM geometry, not a 2-point straight line
     assert rt07["distance_km"] == 12.8
     assert rt07["blocked_segments"] == []
 
-    # each zone's own route has a distinct distance and a straight 2-point
-    # path (no OSM stretch was ever fetched for these three areas)
+    # each zone's own route has a distinct distance, a straight 2-point path
+    # (no OSM stretch was ever fetched for these three areas), and a real
+    # shelter_id — not just an anonymous dest_geom point
     distances = set()
     for code, zone_code in (("RT-02", "ZN-02"), ("RT-03", "ZN-03"), ("RT-04", "ZN-04")):
         route = by_code[code]
         assert route["zone_id"] == zones[zone_code]
+        assert route["shelter_id"] in shelters.values()
         assert len(route["path"]["coordinates"]) == 2
         assert route["distance_km"] is not None
         distances.add(route["distance_km"])
@@ -53,9 +58,11 @@ def test_only_sdma_official_can_create_routes(client, admin_db):
     officer_headers = _auth_headers(client, "field.officer@ps191.dev")
     sdma_headers = _auth_headers(client, "sdma.official@ps191.dev")
     zone_id = client.get("/zones", headers=sdma_headers, params={"limit": 1}).json()["items"][0]["zone_id"]
+    shelter_id = client.get("/shelters", headers=sdma_headers, params={"limit": 1}).json()["items"][0]["shelter_id"]
 
     payload = {
         "zone_id": zone_id,
+        "shelter_id": shelter_id,
         "origin_geom": {"type": "Point", "coordinates": [93.0, 25.1]},
         "dest_geom": {"type": "Point", "coordinates": [93.05, 25.15]},
         "path": {"type": "LineString", "coordinates": [[93.0, 25.1], [93.05, 25.15]]},

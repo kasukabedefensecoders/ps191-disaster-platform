@@ -27,6 +27,7 @@ def _to_route_out(route: Route, origin_geojson: str, dest_geojson: str, path_geo
         route_id=route.route_id,
         display_code=route.display_code,
         zone_id=route.zone_id,
+        shelter_id=route.shelter_id,
         origin_geom=json.loads(origin_geojson),
         dest_geom=json.loads(dest_geojson),
         path=json.loads(path_geojson),
@@ -59,6 +60,7 @@ def create_route(db: Session, payload: RouteCreate) -> RouteOut:
     route = Route(
         display_code=_next_route_code(db),
         zone_id=payload.zone_id,
+        shelter_id=payload.shelter_id,
         origin_geom=func.ST_SetSRID(func.ST_GeomFromGeoJSON(json.dumps(payload.origin_geom)), 4326),
         dest_geom=func.ST_SetSRID(func.ST_GeomFromGeoJSON(json.dumps(payload.dest_geom)), 4326),
         path=func.ST_SetSRID(func.ST_GeomFromGeoJSON(json.dumps(payload.path)), 4326),
