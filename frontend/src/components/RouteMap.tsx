@@ -29,11 +29,6 @@ function pathLatLngs(path: RouteRecord["path"]): L.LatLngExpression[] {
   return (path.coordinates as [number, number][]).map(([lon, lat]) => [lat, lon]);
 }
 
-function pointLatLng(point: RouteRecord["origin_geom"]): L.LatLngExpression {
-  const [lon, lat] = point.coordinates;
-  return [lat, lon];
-}
-
 function dotIcon(color: string): L.DivIcon {
   return L.divIcon({
     className: "",
@@ -81,7 +76,8 @@ export default function RouteMap({ routes, theme = "dark" }: { routes: RouteMapE
     const layers: L.Layer[] = [];
     routes.forEach((route) => {
       const blocked = route.blocked_segments.length > 0;
-      const line = L.polyline(pathLatLngs(route.path), {
+      const latLngs = pathLatLngs(route.path);
+      const line = L.polyline(latLngs, {
         color: blocked ? colors.blocked : colors.clear,
         weight: 4,
         opacity: 0.9,
@@ -89,13 +85,20 @@ export default function RouteMap({ routes, theme = "dark" }: { routes: RouteMapE
       line.bindTooltip(`${route.display_code ?? route.route_id} · ${blocked ? "blocked" : "clear"}`, { sticky: true });
       layers.push(line);
 
-      const origin = L.marker(pointLatLng(route.origin_geom), { icon: dotIcon(ORIGIN_COLOR) }).addTo(map);
+      // Markers sit at the *drawn line's own* two ends, not at
+      // origin_geom/dest_geom directly — those are the raw zone centroid
+      // and shelter point, which OSRM's road-snapping can leave several
+      // km from where the actual route geometry starts/ends (a zone
+      // centroid placed off-road snaps to the nearest real road). Using
+      // the path's own endpoints guarantees a marker is always exactly on
+      // the line it belongs to, whichever geometry source produced it.
+      const origin = L.marker(latLngs[0], { icon: dotIcon(ORIGIN_COLOR) }).addTo(map);
       const originLabel = route.originLabel ?? "Origin";
       origin.bindTooltip(originLabel, { direction: "top", offset: [0, -8] });
       origin.bindPopup(`<b>Start</b><br>${originLabel}`);
       layers.push(origin);
 
-      const dest = L.marker(pointLatLng(route.dest_geom), { icon: shelterIcon(DEST_COLOR) }).addTo(map);
+      const dest = L.marker(latLngs[latLngs.length - 1], { icon: shelterIcon(DEST_COLOR) }).addTo(map);
       const destLabel = route.destLabel ?? "Shelter";
       dest.bindTooltip(destLabel, { direction: "top", offset: [0, -12] });
       dest.bindPopup(`<b>Shelter</b><br>${destLabel}`);
