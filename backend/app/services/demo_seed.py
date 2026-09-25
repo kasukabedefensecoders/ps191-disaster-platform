@@ -23,7 +23,7 @@ from .display_codes import next_display_code
 # hand-run allocation or review would.
 #
 # Only demo-generated state is touched: relocation_records, surveys,
-# risk_forecasts, and the fields their own lifecycles mutate in place
+# risk_forecasts, change_detections, and the fields their own lifecycles mutate in place
 # (vehicle.status, shelter.current_occupancy, zones.risk_score_72h/
 # risk_score_factors) get reset to their app.seed baseline.
 # districts/zones/households/shelters/vehicles/users themselves are never
@@ -121,6 +121,22 @@ def _clear_forecast_state(db: Session) -> None:
     db.commit()
 
 
+def _clear_change_detection_state(db: Session) -> None:
+    """Puts the SAR change-detection screen back to "not run yet" for every
+    zone. Needed because a change_detections row is the frontend's only
+    signal that a zone's detection has been run this demo cycle (Phase 11's
+    interaction-flow fix) — without clearing it here, a zone a judge already
+    ran detection on in an earlier cycle would keep showing that stale
+    result (and its imagery) right through a reset. incident_outcomes.
+    detection_id is nulled rather than the outcome row deleted, same
+    reasoning as _clear_forecast_state's forecast_id: a post-incident entry
+    losing the detection it was logged against is not the same as it never
+    having happened."""
+    db.execute(text("update incident_outcomes set detection_id = null where detection_id in (select detection_id from change_detections)"))
+    db.execute(text("delete from change_detections"))
+    db.commit()
+
+
 def _reseed_sample_imagery(db: Session) -> None:
     """SAR change detection (Phase 11) needs a curated before/after pair
     per zone to run against at all — found missing live after a reset,
@@ -139,6 +155,7 @@ def _reseed_sample_imagery(db: Session) -> None:
 def seed_demo_relocations(db: Session, actor_id: uuid.UUID) -> DemoSeedResponse:
     _clear_relocation_state(db)
     _clear_forecast_state(db)
+    _clear_change_detection_state(db)
     db.execute(text("delete from surveys"))
     _reseed_sample_imagery(db)
     db.commit()

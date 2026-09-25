@@ -19,10 +19,10 @@ def run_change_detection(
     _: object = Depends(require_role("sdma_official")),
 ):
     """Phase 11: runs the differencing/thresholding pipeline against the
-    one curated before/after pair uploaded for this zone (only ZN-01 has
-    one — see app/cv/change_detection.py). Gated to sdma_official like
-    the other manually-triggered pipelines (Phase 10's forecast
-    generation) in the absence of a real scheduler."""
+    one curated before/after pair seeded for this zone (see
+    app/services/change_detection.py's ensure_sample_imagery_for_zone).
+    Gated to sdma_official like the other manually-triggered pipelines
+    (Phase 10's forecast generation) in the absence of a real scheduler."""
     try:
         detection = change_detection_service.run_detection_for_zone(db, zone_id)
     except ChangeDetectionError as exc:

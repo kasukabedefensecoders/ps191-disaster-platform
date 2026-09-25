@@ -190,6 +190,30 @@ def test_reset_demo_data_reseeds_imagery_so_change_detection_works_on_any_zone(c
             admin_db.commit()
 
 
+def test_reset_demo_data_clears_previously_run_detections(client):
+    """Regression test for the interaction-flow bug reported live: the
+    frontend was showing a zone's before/after slider and detection-result
+    panel just because a *previous* demo cycle's run left a change_detections
+    row for it — "Reset demo data" never cleared that table (unlike
+    relocation_records/risk_forecasts/surveys), so a zone stayed looking
+    "already run" straight through a reset instead of going back to
+    "not run yet". services/demo_seed.py's _clear_change_detection_state
+    now deletes change_detections on every reset, matching the pattern
+    _clear_forecast_state already used for risk_forecasts."""
+    headers = _auth_headers(client, "sdma.official@ps191.dev")
+    assert client.post("/demo/seed-relocations", headers=headers).status_code == 200
+
+    zone_id = _zone_id(client, headers, "ZN-01")
+    run_response = client.post(f"/zones/{zone_id}/change-detections/run", headers=headers)
+    assert run_response.status_code == 200
+    assert client.get(f"/zones/{zone_id}/change-detections", headers=headers).json()["count"] == 1
+
+    assert client.post("/demo/seed-relocations", headers=headers).status_code == 200
+    reset_listing = client.get(f"/zones/{zone_id}/change-detections", headers=headers).json()
+    assert reset_listing["count"] == 0
+    assert reset_listing["items"] == []
+
+
 def test_field_officer_cannot_run_or_list_for_unassigned_zone(client):
     officer_headers = _auth_headers(client, "field.officer@ps191.dev")
     sdma_headers = _auth_headers(client, "sdma.official@ps191.dev")
