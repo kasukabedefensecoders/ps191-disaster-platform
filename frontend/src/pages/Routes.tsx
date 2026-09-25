@@ -5,6 +5,7 @@ import { SampleDataBadge } from "../components/badges";
 import { addBlockedSegment, clearBlockedSegments, fetchRoutes, fetchShelters, fetchZones, type RouteRecord, type Shelter, type Zone } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { useTheme } from "../lib/ThemeContext";
+import { fetchOsrmRoute, type OsrmRoute } from "../lib/osrm";
 
 export default function RoutesPage() {
   const { token, user } = useAuth();
@@ -15,6 +16,13 @@ export default function RoutesPage() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reasonDraft, setReasonDraft] = useState<Record<string, string>>({});
+  // Keyed by route_id, which is stable across "Reset demo data" (routes
+  // are baseline data like zones/shelters, never recreated by a reset) —
+  // so this cache naturally satisfies "fetch once per pair" without any
+  // extra invalidation logic. null means "OSRM was tried and failed",
+  // distinct from "not tried yet" (key absent), so a failure isn't retried
+  // forever on re-render.
+  const [osrmByRouteId, setOsrmByRouteId] = useState<Record<string, OsrmRoute | null>>({});
 
   const load = () => {
     if (!token) return;
@@ -30,6 +38,30 @@ export default function RoutesPage() {
   };
 
   useEffect(load, [token]);
+
+  // Real road-following geometry from OSRM's public demo server, one
+  // request per route in parallel, for every route on the page — not just
+  // a selected/highlighted one. Falls back silently (per-route) to
+  // whatever the backend already returned — RT-07's own real OSM stretch,
+  // or a straight line for the rest — so a slow/unavailable OSRM never
+  // blocks or breaks the page (lib/osrm.ts logs the console warning).
+  useEffect(() => {
+    if (!routes) return;
+    const pending = routes.filter((r) => !(r.route_id in osrmByRouteId));
+    if (pending.length === 0) return;
+    pending.forEach((r) => {
+      fetchOsrmRoute(r.origin_geom.coordinates, r.dest_geom.coordinates).then((osrm) => {
+        setOsrmByRouteId((prev) => ({ ...prev, [r.route_id]: osrm }));
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routes]);
+
+  const displayRoutes: RouteRecord[] = (routes ?? []).map((r) => {
+    const osrm = osrmByRouteId[r.route_id];
+    if (!osrm) return r;
+    return { ...r, path: osrm.path, distance_km: osrm.distance_km, estimated_duration_minutes: Math.round(osrm.duration_minutes) };
+  });
 
   const report = async (routeId: string) => {
     if (!token) return;
@@ -66,15 +98,15 @@ export default function RoutesPage() {
   return (
     <div style={{ display: "flex", height: "100%" }}>
       <div style={{ flex: 2, position: "relative", borderRight: "1px solid var(--border)" }}>
-        <RouteMap routes={routes} theme={theme} />
+        <RouteMap routes={displayRoutes} theme={theme} />
         <div style={{ position: "absolute", left: 10, bottom: 10, zIndex: 500 }}>
           <SampleDataBadge />
         </div>
       </div>
       <div style={{ flex: 1, minWidth: 360, maxWidth: 440, overflow: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
         <h2 style={{ fontSize: 18, marginBottom: 8 }}>Evacuation routes</h2>
-        {routes.length === 0 && <p style={{ fontSize: 12, color: "var(--ink3)" }}>No routes recorded.</p>}
-        {[...routes]
+        {displayRoutes.length === 0 && <p style={{ fontSize: 12, color: "var(--ink3)" }}>No routes recorded.</p>}
+        {[...displayRoutes]
           .sort((a, b) => (zonesById[a.zone_id]?.display_code ?? "").localeCompare(zonesById[b.zone_id]?.display_code ?? ""))
           .map((r) => {
           const blocked = r.blocked_segments.length > 0;
