@@ -1,6 +1,6 @@
 # Backend Schema Document
 
-**Intelligent Hazard Red-Zone & Relocation Platform**
+**RAKSHAK360 — Intelligent Hazard Red-Zone & Relocation Platform**
 
 **Smart India Hackathon 2026 — Problem Statement SIH26191**
 

@@ -43,10 +43,10 @@ export default function ShelterOfficerDashboard() {
             color: "var(--on-brand)",
           }}
         >
-          RZ
+          RK
         </div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ font: "600 13px/1.2 var(--font-interface)", color: "var(--ink)" }}>Shelter Officer Dashboard</div>
+          <div style={{ font: "600 13px/1.2 var(--font-interface)", color: "var(--ink)" }}>RAKSHAK360</div>
           <div style={{ font: "400 10px/1.3 var(--font-data)", color: "var(--ink4)" }}>SIH26191 · shelter officer</div>
         </div>
         <div style={{ flex: 1 }} />

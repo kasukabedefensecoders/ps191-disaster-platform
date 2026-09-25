@@ -20,7 +20,7 @@ from .routers.surveys import router as surveys_router
 from .routers.vehicles import router as vehicles_router
 from .routers.zones import router as zones_router
 
-app = FastAPI(title="PS191 — Hazard Red-Zone & Relocation Platform")
+app = FastAPI(title="RAKSHAK360 — Hazard Red-Zone & Relocation Platform")
 
 # Rule 8 (low-bandwidth by default): assume a satellite-backed link, gzip
 # every response, not just the dashboard summary endpoint.

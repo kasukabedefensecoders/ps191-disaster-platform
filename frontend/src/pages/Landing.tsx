@@ -107,10 +107,10 @@ export default function Landing() {
             color: "var(--on-brand)",
           }}
         >
-          RZ
+          RK
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ font: "600 13px/1.15 var(--font-interface)", color: "var(--ink)" }}>Red Zone &amp; Relocation</div>
+          <div style={{ font: "600 13px/1.15 var(--font-interface)", color: "var(--ink)" }}>RAKSHAK360</div>
           <div style={{ font: "400 10px/1.4 var(--font-data)", color: "var(--ink4)", letterSpacing: "0.06em" }}>SIH26191 · NDRF / MHA</div>
         </div>
         <ThemeToggle />
@@ -261,7 +261,7 @@ export default function Landing() {
           textAlign: "center",
         }}
       >
-        Prototype · sample data · SIH26191
+        RAKSHAK360 · Prototype · sample data · SIH26191
       </footer>
 
       {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} initialRole={initialRole} />}

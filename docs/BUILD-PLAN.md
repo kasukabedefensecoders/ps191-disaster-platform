@@ -1,6 +1,6 @@
 # Build Plan
 
-## Intelligent Hazard Red-Zone & Relocation Platform — SIH26191
+## RAKSHAK360 — Intelligent Hazard Red-Zone & Relocation Platform — SIH26191
 
 | | |
 |---|---|

@@ -78,14 +78,19 @@ HOUSEHOLDS = [
 # distance to mean anything once shelter_matching.py computes it.
 SHELTERS = [
     # code, name, max_capacity, current_occupancy, facilities, (lon, lat), status, contact_name, contact_phone, needs
-    ("SH-01", "Ridge Higher Secondary School", 450, 180, {"water": True, "medical": True, "toilets": True, "power": True}, (93.0205, 25.1700), "active", "D. Langthasa", "+91 94350 11201", []),
-    ("SH-02", "Block Community Hall", 200, 95, {"water": True, "toilets": True}, (93.1255, 25.3035), "active", "P. Jeme", "+91 94350 11202", []),
-    ("SH-03", "District Stadium Ground", 800, 120, {"water": True, "toilets": True, "power": True}, (93.0115, 25.1620), "active", "S. Hojai", "+91 94350 11203", []),
-    ("SH-04", "Block Office Complex", 150, 148, {"water": True, "medical": True, "toilets": True}, (92.7020, 25.4650), "active", "R. Thaosen", "+91 94350 11204", ["food", "blankets"]),
+    # contact_phone uses the +91 98765 43210 block, the de facto "this is a
+    # placeholder" Indian mobile number convention — 94350 11201-style
+    # numbers were dropped because that prefix is a real, currently-
+    # allocated operator block, so a sequential-looking suffix was no
+    # guarantee the full 10 digits weren't a genuine subscriber's.
+    ("SH-01", "Ridge Higher Secondary School", 450, 180, {"water": True, "medical": True, "toilets": True, "power": True}, (93.0205, 25.1700), "active", "D. Langthasa", "+91 98765 43210", []),
+    ("SH-02", "Block Community Hall", 200, 95, {"water": True, "toilets": True}, (93.1255, 25.3035), "active", "P. Jeme", "+91 98765 43211", []),
+    ("SH-03", "District Stadium Ground", 800, 120, {"water": True, "toilets": True, "power": True}, (93.0115, 25.1620), "active", "S. Hojai", "+91 98765 43212", []),
+    ("SH-04", "Block Office Complex", 150, 148, {"water": True, "medical": True, "toilets": True}, (92.7020, 25.4650), "active", "R. Thaosen", "+91 98765 43213", ["food", "blankets"]),
     # SH-05: PROTOTYPE/PS191 Platform.dc.html's own seed marks this shelter
     # "Standby" (0 occupancy, held in reserve) — ported as the schema's new
     # standby status rather than "active" with zero occupants.
-    ("SH-05", "Tea Estate Godown", 300, 0, {"water": True}, (92.9580, 25.0320), "standby", "N. Barman", "+91 94350 11205", []),
+    ("SH-05", "Tea Estate Godown", 300, 0, {"water": True}, (92.9580, 25.0320), "standby", "N. Barman", "+91 98765 43214", []),
 ]
 
 # zone_code -> incident_history rows (docs/BACKEND-SCHEMA.md §6.2 shape),

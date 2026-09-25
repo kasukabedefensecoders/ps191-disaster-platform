@@ -1,4 +1,4 @@
-# PS191 — Hazard Red-Zone & Relocation Platform
+# RAKSHAK360 — Hazard Red-Zone & Relocation Platform
 
 Smart India Hackathon 2026, Problem Statement **SIH26191** (Ministry of Home Affairs / NDRF).
 An authority-only decision and coordination layer for disaster relocation: which settlements are at risk, who lives there, where they can go, and what is stopping them getting there.

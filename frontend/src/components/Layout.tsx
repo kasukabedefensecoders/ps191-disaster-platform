@@ -11,9 +11,9 @@ type NavItem = { to: string; label: string; end?: boolean; badge?: string };
 type NavGroup = { label: string | null; items: NavItem[] };
 
 const ROLE_BRAND: Record<CurrentUser["role"], { name: string; sub: string }> = {
-  sdma_official: { name: "Red Zone & Relocation", sub: "SIH26191 · NDRF / MHA" },
-  field_officer: { name: "Field Survey App", sub: "SIH26191 · field officer" },
-  control_room: { name: "Monitoring Console", sub: "SIH26191 · control room" },
+  sdma_official: { name: "RAKSHAK360", sub: "SIH26191 · NDRF / MHA" },
+  field_officer: { name: "RAKSHAK360", sub: "SIH26191 · field officer" },
+  control_room: { name: "RAKSHAK360", sub: "SIH26191 · control room" },
 };
 
 // Grouped exactly as PROTOTYPE/PS191 Platform.dc.html's nav rail (§5's
@@ -159,11 +159,11 @@ export default function Layout() {
                 color: "var(--on-brand)",
               }}
             >
-              RZ
+              RK
             </div>
             <div>
               <div style={{ font: "600 13px/1.15 var(--font-interface)", color: "var(--ink)" }}>
-                {user ? ROLE_BRAND[user.role].name : "PS191"}
+                {user ? ROLE_BRAND[user.role].name : "RAKSHAK360"}
               </div>
               <div style={{ font: "400 10px/1.4 var(--font-data)", color: "var(--ink4)", letterSpacing: "0.06em" }}>
                 {user ? ROLE_BRAND[user.role].sub : ""}

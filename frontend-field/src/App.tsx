@@ -73,7 +73,7 @@ function Login({ onLoggedIn }: { onLoggedIn: (token: string, user: CurrentUser) 
   return (
     <main style={page}>
       <form onSubmit={submit} style={card}>
-        <h1 style={{ fontSize: 15, margin: 0 }}>PS191 Field Survey</h1>
+        <h1 style={{ fontSize: 15, margin: 0 }}>RAKSHAK360 Field Survey</h1>
         <p style={{ fontSize: 12, color: "var(--ink3)", margin: 0 }}>Sign in once — the capture form works offline after that.</p>
         <input placeholder="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} style={input} />
         <input
@@ -228,7 +228,7 @@ function SurveyApp({ token, user }: { token: string; user: CurrentUser }) {
     <main style={page}>
       <div style={{ ...card, width: 380 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <h1 style={{ fontSize: 15, margin: 0 }}>PS191 Field Survey</h1>
+          <h1 style={{ fontSize: 15, margin: 0 }}>RAKSHAK360 Field Survey</h1>
           <span style={{ fontSize: 11, color: "var(--ink3)" }}>{user.full_name}</span>
         </div>
 

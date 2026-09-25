@@ -16,8 +16,8 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,png,ico}"],
       },
       manifest: {
-        name: "PS191 Field Survey",
-        short_name: "PS191 Field",
+        name: "RAKSHAK360 Field Survey",
+        short_name: "RAKSHAK360 Field",
         description: "Hazard vulnerability-assessment survey capture — offline-first field app",
         theme_color: "#070b16",
         background_color: "#070b16",
