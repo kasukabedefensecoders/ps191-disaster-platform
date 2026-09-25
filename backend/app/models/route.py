@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from geoalchemy2 import Geometry
-from sqlalchemy import Text, Integer, Numeric, DateTime, func
+from sqlalchemy import Text, Integer, Numeric, DateTime, ForeignKey, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,6 +14,11 @@ class Route(Base):
 
     route_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     display_code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    # The zone this is the evacuation route *for* — added in migration 0012
+    # once "Evacuation routes" grew from a single demoed route into a
+    # per-zone list; every route now represents one zone's path to its
+    # nearest eligible shelter, not an unscoped named route.
+    zone_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("zones.zone_id"), nullable=False)
     origin_geom = mapped_column(Geometry(geometry_type="POINT", srid=4326), nullable=False)
     dest_geom = mapped_column(Geometry(geometry_type="POINT", srid=4326), nullable=False)
     path = mapped_column(Geometry(geometry_type="LINESTRING", srid=4326), nullable=False)

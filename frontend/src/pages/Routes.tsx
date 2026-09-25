@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import RouteMap from "../components/RouteMap";
 import { SampleDataBadge } from "../components/badges";
-import { addBlockedSegment, clearBlockedSegments, fetchRoutes, type RouteRecord } from "../lib/api";
+import { addBlockedSegment, clearBlockedSegments, fetchRoutes, fetchZones, type RouteRecord, type Zone } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { useTheme } from "../lib/ThemeContext";
 
@@ -10,6 +10,7 @@ export default function RoutesPage() {
   const { token, user } = useAuth();
   const { theme } = useTheme();
   const [routes, setRoutes] = useState<RouteRecord[] | null>(null);
+  const [zonesById, setZonesById] = useState<Record<string, Zone>>({});
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reasonDraft, setReasonDraft] = useState<Record<string, string>>({});
@@ -19,6 +20,9 @@ export default function RoutesPage() {
     fetchRoutes(token)
       .then((r) => setRoutes(r.items))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+    fetchZones(token)
+      .then((r) => setZonesById(Object.fromEntries(r.items.map((z) => [z.zone_id, z]))))
+      .catch(() => {});
   };
 
   useEffect(load, [token]);
@@ -66,8 +70,11 @@ export default function RoutesPage() {
       <div style={{ flex: 1, minWidth: 360, maxWidth: 440, overflow: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
         <h2 style={{ fontSize: 18, marginBottom: 8 }}>Evacuation routes</h2>
         {routes.length === 0 && <p style={{ fontSize: 12, color: "var(--ink3)" }}>No routes recorded.</p>}
-        {routes.map((r) => {
+        {[...routes]
+          .sort((a, b) => (zonesById[a.zone_id]?.display_code ?? "").localeCompare(zonesById[b.zone_id]?.display_code ?? ""))
+          .map((r) => {
           const blocked = r.blocked_segments.length > 0;
+          const zone = zonesById[r.zone_id];
           return (
             <div key={r.route_id} className="ps-card-hover" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 6, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -76,6 +83,11 @@ export default function RoutesPage() {
                   {blocked ? "Blocked" : "Clear"}
                 </span>
               </div>
+              {zone && (
+                <div style={{ fontSize: 11, color: "var(--ink4)" }}>
+                  For {zone.display_code} · {zone.name}
+                </div>
+              )}
               <div style={{ fontFamily: "var(--font-data)", fontSize: 12, color: "var(--ink3)" }}>
                 {r.distance_km !== null ? `${r.distance_km.toFixed(1)} km` : "distance unknown"}
                 {r.estimated_duration_minutes !== null ? ` · ${r.estimated_duration_minutes} min` : ""}

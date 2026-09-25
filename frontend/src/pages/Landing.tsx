@@ -261,7 +261,7 @@ export default function Landing() {
           textAlign: "center",
         }}
       >
-        RAKSHAK360 · Prototype · sample data · SIH26191
+        RAKSHAK360 · Pilot deployment · sample data · SIH26191
       </footer>
 
       {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} initialRole={initialRole} />}

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 class RouteOut(BaseModel):
     route_id: uuid.UUID
     display_code: str | None
+    zone_id: uuid.UUID
     origin_geom: dict
     dest_geom: dict
     path: dict
@@ -25,6 +26,7 @@ class RouteListResponse(BaseModel):
 
 
 class RouteCreate(BaseModel):
+    zone_id: uuid.UUID
     origin_geom: dict
     dest_geom: dict
     path: dict

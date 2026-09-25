@@ -39,7 +39,7 @@ docker compose exec backend alembic upgrade head
 docker compose exec backend python -m app.seed
 ```
 
-`app.seed` populates one district (Dima Hasao), 4 zones, 11 households, 5 shelters, 7 vehicles, 2 escorts, 1 route and 3 demo user accounts — see [`backend/app/seed.py`](backend/app/seed.py) for the exact figures, all clearly marked `SAMPLE DATA` (never presented as live government data — CLAUDE.md rule 6).
+`app.seed` populates one district (Dima Hasao), 4 zones, 11 households, 5 shelters, 7 vehicles, 2 escorts, 4 evacuation routes (one per zone) and 3 demo user accounts — see [`backend/app/seed.py`](backend/app/seed.py) for the exact figures, all clearly marked `SAMPLE DATA` (never presented as live government data — CLAUDE.md rule 6).
 
 Open **http://localhost:5173** — you land on the public landing page first (map, hero copy, role descriptions), not a login form. Sign in from there.
 

@@ -18,7 +18,7 @@ def test_sdma_official_sees_full_summary(client):
 
     assert body["zones"]["count"] == 4
     assert body["shelters"]["count"] == 5
-    assert body["routes"]["count"] == 1
+    assert body["routes"]["count"] == 4
     assert len(body["top_priority_households"]) <= 10
     assert len(body["top_priority_households"]) > 0
 

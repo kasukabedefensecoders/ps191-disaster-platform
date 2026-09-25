@@ -365,6 +365,7 @@ create index idx_escorts_status on escorts(status);
 create table routes (
   route_id uuid primary key default gen_random_uuid(),
   display_code text unique,
+  zone_id uuid not null references zones(zone_id),
   origin_geom geometry(Point, 4326) not null,
   dest_geom geometry(Point, 4326) not null,
   path geometry(LineString, 4326) not null,
@@ -376,9 +377,10 @@ create table routes (
 );
  
 create index idx_routes_path on routes using gist (path);
+create index idx_routes_zone on routes(zone_id);
 ```
 
-`path` is the OSRM-computed geometry (TRD §4); `blocked_segments` is what the Routing Service's "blocked segment penalty layer" (TRD §7.7) actually persists — see §6.4 for its shape.
+`path` is the OSRM-computed geometry (TRD §4); `blocked_segments` is what the Routing Service's "blocked segment penalty layer" (TRD §7.7) actually persists — see §6.4 for its shape. `zone_id` (migration `0012`) is which zone this is the evacuation route *for* — added after "Evacuation routes" grew from a single demoed route (`RT-07`, real OSM geometry) into one route per zone; `app/seed.py` computes ZN-02/03/04's routes the same honest straight-line-to-nearest-shelter way `services/shelter_matching.py` already handles "no OSRM instance" for households.
 
 ### 5.10 `relocation_records`
 

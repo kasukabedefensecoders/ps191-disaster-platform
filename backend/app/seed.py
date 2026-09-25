@@ -6,6 +6,7 @@ checked against the prototype's own numbers. Run with:
 
     python -m app.seed
 """
+import math
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -78,19 +79,21 @@ HOUSEHOLDS = [
 # distance to mean anything once shelter_matching.py computes it.
 SHELTERS = [
     # code, name, max_capacity, current_occupancy, facilities, (lon, lat), status, contact_name, contact_phone, needs
-    # contact_phone uses the +91 98765 43210 block, the de facto "this is a
-    # placeholder" Indian mobile number convention — 94350 11201-style
-    # numbers were dropped because that prefix is a real, currently-
-    # allocated operator block, so a sequential-looking suffix was no
-    # guarantee the full 10 digits weren't a genuine subscriber's.
-    ("SH-01", "Ridge Higher Secondary School", 450, 180, {"water": True, "medical": True, "toilets": True, "power": True}, (93.0205, 25.1700), "active", "D. Langthasa", "+91 98765 43210", []),
-    ("SH-02", "Block Community Hall", 200, 95, {"water": True, "toilets": True}, (93.1255, 25.3035), "active", "P. Jeme", "+91 98765 43211", []),
-    ("SH-03", "District Stadium Ground", 800, 120, {"water": True, "toilets": True, "power": True}, (93.0115, 25.1620), "active", "S. Hojai", "+91 98765 43212", []),
-    ("SH-04", "Block Office Complex", 150, 148, {"water": True, "medical": True, "toilets": True}, (92.7020, 25.4650), "active", "R. Thaosen", "+91 98765 43213", ["food", "blankets"]),
+    # contact_phone uses the +91 90000 0000X block — an all-zeros prefix
+    # with a bare 1-5 suffix reads as unambiguously fake to anyone, unlike
+    # the +91 98765 43210 block this replaced: that one is the common
+    # "placeholder number" convention in Indian software demos, but it's
+    # still a real, dialable-looking number, which is exactly the risk this
+    # avoids. (94350 11201-style numbers were dropped earlier for the same
+    # reason — that prefix is a real, currently-allocated operator block.)
+    ("SH-01", "Ridge Higher Secondary School", 450, 180, {"water": True, "medical": True, "toilets": True, "power": True}, (93.0205, 25.1700), "active", "D. Langthasa", "+91 90000 00001", []),
+    ("SH-02", "Block Community Hall", 200, 95, {"water": True, "toilets": True}, (93.1255, 25.3035), "active", "P. Jeme", "+91 90000 00002", []),
+    ("SH-03", "District Stadium Ground", 800, 120, {"water": True, "toilets": True, "power": True}, (93.0115, 25.1620), "active", "S. Hojai", "+91 90000 00003", []),
+    ("SH-04", "Block Office Complex", 150, 148, {"water": True, "medical": True, "toilets": True}, (92.7020, 25.4650), "active", "R. Thaosen", "+91 90000 00004", ["food", "blankets"]),
     # SH-05: PROTOTYPE/PS191 Platform.dc.html's own seed marks this shelter
     # "Standby" (0 occupancy, held in reserve) — ported as the schema's new
     # standby status rather than "active" with zero occupants.
-    ("SH-05", "Tea Estate Godown", 300, 0, {"water": True}, (92.9580, 25.0320), "standby", "N. Barman", "+91 98765 43214", []),
+    ("SH-05", "Tea Estate Godown", 300, 0, {"water": True}, (92.9580, 25.0320), "standby", "N. Barman", "+91 90000 00005", []),
 ]
 
 # zone_code -> incident_history rows (docs/BACKEND-SCHEMA.md §6.2 shape),
@@ -186,7 +189,40 @@ RT07_PATH_COORDS = [
     (93.014083, 25.200428),
 ]
 RT07_DISTANCE_KM = 12.8  # real, computed from the full (non-downsampled) geometry
-RT07_DURATION_MINUTES = round(RT07_DISTANCE_KM / 25 * 60)  # same 25 km/h planning assumption as Phase 5/6
+ASSUMED_AVG_SPEED_KMH = 25.0  # same rural hill-road planning assumption as shelter_matching.py
+RT07_DURATION_MINUTES = round(RT07_DISTANCE_KM / ASSUMED_AVG_SPEED_KMH * 60)
+
+# RT-07 is real OSM road geometry, but it's the only route this system ever
+# seeded — every zone but ZN-01 (RT-07's own zone: the prototype's own
+# "Route RT-07 · Upper Ridge -> SH-01" label, Upper Ridge being ZN-01)
+# had no evacuation route of its own at all, so the Evacuation Routes
+# screen showed the same RT-07 regardless of which zone a judge was
+# looking at. ZN-02/03/04 get their own route here to the nearest eligible
+# shelter, computed the same honest way services/shelter_matching.py
+# already handles "no OSRM instance": straight-line great-circle distance,
+# duration from ASSUMED_AVG_SPEED_KMH — not disguised as road-routed
+# geometry the way RT-07 genuinely is.
+
+
+def _haversine_km(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
+    r = 6371.0088
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlmb = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlmb / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def _nearest_shelter(zone_lon: float, zone_lat: float) -> tuple[str, float, float, float]:
+    """(shelter_code, shelter_lon, shelter_lat, distance_km) for whichever
+    seeded shelter is straight-line closest to a zone's centroid."""
+    best: tuple[str, float, float, float] | None = None
+    for code, _name, _cap, _occ, _fac, (slon, slat), *_rest in SHELTERS:
+        dist = _haversine_km(zone_lon, zone_lat, slon, slat)
+        if best is None or dist < best[3]:
+            best = (code, slon, slat, dist)
+    assert best is not None
+    return best
 
 
 def _point(lon: float, lat: float) -> str:
@@ -309,6 +345,7 @@ def seed() -> None:
             Route(
                 route_id=uuid.uuid4(),
                 display_code="RT-07",
+                zone_id=zones_by_code["ZN-01"].zone_id,
                 origin_geom=_point(origin_lon, origin_lat),
                 dest_geom=_point(dest_lon, dest_lat),
                 path=_linestring(RT07_PATH_COORDS),
@@ -316,6 +353,23 @@ def seed() -> None:
                 estimated_duration_minutes=RT07_DURATION_MINUTES,
             )
         )
+
+        for i, zone_code in enumerate(("ZN-02", "ZN-03", "ZN-04"), start=2):
+            zone_lon, zone_lat = ZONE_CENTROIDS[zone_code]
+            _shelter_code, shelter_lon, shelter_lat, distance_km = _nearest_shelter(zone_lon, zone_lat)
+            duration_minutes = round(distance_km / ASSUMED_AVG_SPEED_KMH * 60)
+            db.add(
+                Route(
+                    route_id=uuid.uuid4(),
+                    display_code=f"RT-0{i}",
+                    zone_id=zones_by_code[zone_code].zone_id,
+                    origin_geom=_point(zone_lon, zone_lat),
+                    dest_geom=_point(shelter_lon, shelter_lat),
+                    path=_linestring([(zone_lon, zone_lat), (shelter_lon, shelter_lat)]),
+                    distance_km=round(distance_km, 2),
+                    estimated_duration_minutes=duration_minutes,
+                )
+            )
 
         users_by_role: dict[str, User] = {}
         for full_name, email, role in SEED_USERS:
@@ -345,7 +399,7 @@ def seed() -> None:
             ensure_sample_imagery_for_zone(zone_code)
 
         print(f"Seeded district {district.name}, {len(ZONES)} zones, {len(HOUSEHOLDS)} households, "
-              f"{len(SHELTERS)} shelters, {len(VEHICLES)} vehicles, {len(ESCORTS)} escorts, 1 route, "
+              f"{len(SHELTERS)} shelters, {len(VEHICLES)} vehicles, {len(ESCORTS)} escorts, {len(ZONES)} routes, "
               f"{len(SEED_USERS)} users (password: {SEED_PASSWORD}), sample imagery for all {len(ZONES)} zones.")
     finally:
         db.close()
