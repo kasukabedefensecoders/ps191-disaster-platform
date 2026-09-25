@@ -1,7 +1,10 @@
-"""Phase 11: differencing/thresholding change detection against the one
-curated (synthetic) before/after pair seeded for ZN-01 (see
-app/cv/change_detection.py's module docstring for what's real vs.
-labeled-synthetic).
+"""Phase 11: differencing/thresholding change detection against a curated
+(synthetic) before/after pair (see app/cv/change_detection.py's module
+docstring for what's real vs. labeled-synthetic). Seeded for every zone as
+of the "Reset demo data" fix (services/demo_seed.py's
+_reseed_sample_imagery) — earlier this was ZN-01 only, which is why a
+"zone with no imagery" test case now has to create a fresh zone rather
+than pointing at one of the seeded four.
 """
 from sqlalchemy import text
 
@@ -16,6 +19,20 @@ def _auth_headers(client, email):
 def _zone_id(client, headers, display_code):
     zones = client.get("/zones", headers=headers, params={"limit": 200}).json()["items"]
     return next(z["zone_id"] for z in zones if z["display_code"] == display_code)
+
+
+def _create_zone_without_imagery(client, headers):
+    """A zone none of app.seed's/demo_seed's imagery-seeding paths ever
+    touch, for tests that need "no curated pair exists yet"."""
+    district_id = client.get("/zones", headers=headers, params={"limit": 1}).json()["items"][0]["district_id"]
+    payload = {
+        "display_code": "ZN-NO-IMAGERY",
+        "district_id": district_id,
+        "name": "No Imagery Zone",
+        "geom": {"type": "Polygon", "coordinates": [[[93.0, 25.0], [93.01, 25.0], [93.01, 25.01], [93.0, 25.01], [93.0, 25.0]]]},
+        "hazard_types": ["flood"],
+    }
+    return client.post("/zones", headers=headers, json=payload).json()["zone_id"]
 
 
 def test_run_requires_auth(client):
@@ -53,11 +70,15 @@ def test_run_detection_on_curated_pair_finds_the_simulated_scar(client, admin_db
         admin_db.commit()
 
 
-def test_run_detection_without_curated_imagery_returns_400(client):
+def test_run_detection_without_curated_imagery_returns_400(client, admin_db):
     headers = _auth_headers(client, "sdma.official@ps191.dev")
-    zone_id = _zone_id(client, headers, "ZN-02")  # no imagery seeded for this zone
-    response = client.post(f"/zones/{zone_id}/change-detections/run", headers=headers)
-    assert response.status_code == 400
+    zone_id = _create_zone_without_imagery(client, headers)
+    try:
+        response = client.post(f"/zones/{zone_id}/change-detections/run", headers=headers)
+        assert response.status_code == 400
+    finally:
+        admin_db.execute(text("delete from zones where zone_id = :id"), {"id": zone_id})
+        admin_db.commit()
 
 
 def test_run_detection_cross_references_households_and_surveys_in_the_scar(client, admin_db):
@@ -132,15 +153,41 @@ def test_zone_image_endpoint_serves_real_png_bytes(client):
     assert before.content != after.content  # a genuine before/after pair, not the same file twice
 
 
-def test_zone_image_404s_for_zone_without_curated_imagery(client):
+def test_zone_image_404s_for_zone_without_curated_imagery(client, admin_db):
     headers = _auth_headers(client, "sdma.official@ps191.dev")
-    zone_id = _zone_id(client, headers, "ZN-02")
-    assert client.get(f"/zones/{zone_id}/change-detections/image/before", headers=headers).status_code == 404
+    zone_id = _create_zone_without_imagery(client, headers)
+    try:
+        assert client.get(f"/zones/{zone_id}/change-detections/image/before", headers=headers).status_code == 404
+    finally:
+        admin_db.execute(text("delete from zones where zone_id = :id"), {"id": zone_id})
+        admin_db.commit()
 
 
 def test_zone_image_requires_auth(client):
     zone_id = "00000000-0000-0000-0000-000000000000"
     assert client.get(f"/zones/{zone_id}/change-detections/image/before").status_code == 401
+
+
+def test_reset_demo_data_reseeds_imagery_so_change_detection_works_on_any_zone(client, admin_db):
+    """Regression test for a real bug reported after clicking "Reset demo
+    data" on the live app: SAR change detection 400'd for ZN-01 right after
+    a reset. Reset never deletes change_detections/sample_imagery, so the
+    real cause was that only ZN-01 ever had a curated pair generated in the
+    first place (app/seed.py used to call ensure_sample_imagery_for_zone
+    once, for ZN-01 only) — "Reset demo data" now reseeds every zone's pair
+    (services/demo_seed.py's _reseed_sample_imagery), so this must succeed
+    for a zone that was never the original ZN-01 special case."""
+    headers = _auth_headers(client, "sdma.official@ps191.dev")
+    assert client.post("/demo/seed-relocations", headers=headers).status_code == 200
+
+    zone_id = _zone_id(client, headers, "ZN-02")
+    response = client.post(f"/zones/{zone_id}/change-detections/run", headers=headers)
+    try:
+        assert response.status_code == 200, response.text
+    finally:
+        if response.status_code == 200:
+            admin_db.execute(text("delete from change_detections where detection_id = :id"), {"id": response.json()["detection_id"]})
+            admin_db.commit()
 
 
 def test_field_officer_cannot_run_or_list_for_unassigned_zone(client):

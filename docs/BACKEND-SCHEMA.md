@@ -455,7 +455,22 @@ create index idx_change_detections_zone on change_detections(zone_id);
 create index idx_change_detections_geom on change_detections using gist (affected_area_geom);
 ```
 
-`before_image_ref`/`after_image_ref` are object-storage keys (MinIO/S3, TRD §4) — imagery itself never lives in PostgreSQL. `cross_referenced_survey_ids`/`cross_referenced_household_ids` are plain UUID arrays rather than a join table, because this is a one-time computed result written once per detection run, not a relationship that grows or needs its own queries.
+`before_image_ref`/`after_image_ref` are descriptive labels (`zones/{code}/before.png` style), not literal object-storage keys as originally designed — **see §5.16a below: the one curated pair this platform actually runs against lives in Postgres, not MinIO/S3, because no MinIO instance exists on the live deployment.** A real, non-demo `before_image_ref` (production scope, TRD §4) would still be an object-storage key; `change_detections` itself doesn't change to accommodate that, only where the *demo* pair's bytes are read from does. `cross_referenced_survey_ids`/`cross_referenced_household_ids` are plain UUID arrays rather than a join table, because this is a one-time computed result written once per detection run, not a relationship that grows or needs its own queries.
+
+### 5.12a `sample_imagery`
+
+```sql
+create table sample_imagery (
+  zone_display_code text not null,
+  kind text not null check (kind in ('before', 'after')),
+  content_type text not null,
+  data bytea not null,
+  created_at timestamptz not null default now(),
+  primary key (zone_display_code, kind)
+);
+```
+
+Added in migration `0010`, not part of the original v1.0 design — a genuine deployment-driven schema change, not a stylistic one. `POST /zones/{id}/change-detections/run` (§7.11) needs a real before/after pair to run its real differencing pipeline against; the pair itself is a curated, hackathon-labeled synthetic image (`app/cv/change_detection.py`'s module docstring — a NumPy-generated texture standing in for a satellite pass, not a real Sentinel capture), which was originally meant to live in MinIO (TRD §4's object-storage design) but couldn't, because no MinIO instance is provisioned on the live Railway deployment (`docs/TRD.md` §11) — `object_exists()` against an unreachable host returns `False` indistinguishably from "never uploaded," which read live as "no curated before/after imagery uploaded for zone 'ZN-01' yet" even immediately after a fresh seed or reset. Two small (~200x200, grayscale) PNGs per zone is well within reason to store as `bytea` directly rather than stand up object storage for; this table exists specifically for that one curated demo asset, not as a general-purpose MinIO replacement — no RLS (not household-linked data, same reasoning as `handoff_logs`, §7), and `app_user` has a direct `select, insert, update, delete` grant (migration `0010`) since it's fully reseedable, unlike the append-only `audit_log`.
 
 ### 5.13 `user_zone_assignments`
 

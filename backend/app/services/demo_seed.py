@@ -10,6 +10,7 @@ from ..schemas.relocation import RelocationRecordCreate
 from ..seed import SHELTERS as SEED_SHELTERS
 from ..seed import ZONES as SEED_ZONES
 from . import relocations as relocations_service
+from .change_detection import ensure_sample_imagery_for_zone
 from .display_codes import next_display_code
 
 # Change 4's "Load Demo Data" button. Judge-facing, so it's a true reset on
@@ -120,10 +121,26 @@ def _clear_forecast_state(db: Session) -> None:
     db.commit()
 
 
+def _reseed_sample_imagery(db: Session) -> None:
+    """SAR change detection (Phase 11) needs a curated before/after pair
+    per zone to run against at all — found missing live after a reset,
+    not because reset ever deleted it (it doesn't touch sample_imagery or
+    change_detections), but because no zone other than ZN-01 ever had one
+    generated in the first place (app/seed.py only calls
+    ensure_sample_imagery_for_zone for ZN-01, once, at initial setup).
+    Idempotent (ensure_sample_imagery_for_zone no-ops if a zone's pair
+    already exists), so calling it for every zone on every reset is cheap
+    and makes "Run detection" work immediately after a reset for any
+    zone, not just whichever one happened to get seeded first."""
+    for zone in db.scalars(select(Zone)).all():
+        ensure_sample_imagery_for_zone(zone.display_code, db)
+
+
 def seed_demo_relocations(db: Session, actor_id: uuid.UUID) -> DemoSeedResponse:
     _clear_relocation_state(db)
     _clear_forecast_state(db)
     db.execute(text("delete from surveys"))
+    _reseed_sample_imagery(db)
     db.commit()
 
     relocation_items = _seed_relocations(db, actor_id)

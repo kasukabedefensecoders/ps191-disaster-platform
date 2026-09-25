@@ -11,6 +11,7 @@ from .route import Route
 from .relocation_record import RelocationRecord
 from .risk_forecast import RiskForecast
 from .change_detection import ChangeDetection
+from .sample_imagery import SampleImagery
 from .user_zone_assignment import UserZoneAssignment
 from .handoff_log import HandoffLog
 from .audit_log import AuditLog
@@ -30,6 +31,7 @@ __all__ = [
     "RelocationRecord",
     "RiskForecast",
     "ChangeDetection",
+    "SampleImagery",
     "UserZoneAssignment",
     "HandoffLog",
     "AuditLog",

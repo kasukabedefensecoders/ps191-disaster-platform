@@ -61,7 +61,7 @@ def test_create_relocation_freezes_scores_assigns_transport_and_writes_audit_log
     record = response.json()
 
     try:
-        # HH-112's priority is hand-verified at 0.86/"immediate" (test_scoring.py)
+        # HH-112's priority is hand-verified at 0.81/"immediate" (test_scoring.py)
         assert record["priority_tier"] == "immediate"
         assert record["priority_factors"] is not None and len(record["priority_factors"]) == 5
         assert record["allocation_factors"] is not None and len(record["allocation_factors"]) == 5

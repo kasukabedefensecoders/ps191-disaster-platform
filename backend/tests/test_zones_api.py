@@ -17,6 +17,26 @@ def test_list_zones_requires_auth(client):
     assert response.status_code == 401
 
 
+def test_seeded_risk_score_lands_in_the_same_colour_band_as_gsi_classification(client):
+    """Regression test for a real bug reported live: after "Reset demo
+    data", a zone GSI marks "High" displayed green/low-risk on the map,
+    because the seeded risk_score_72h used to be ml/forecast_model.py's
+    raw 72-hour training-curve value — always the low point of a curve
+    that peaks early and recedes by 72h for every zone in this district.
+    frontend/src/lib/riskColor.ts's bands are >=80/>=65/>=45/>=28/else, so
+    "High" (sev1/sev2, must colour red/orange) needs risk*100 >= 65 and
+    "Moderate" (sev3, amber) needs 45 <= risk*100 < 65; this pins that
+    invariant at the API level so it can't silently regress."""
+    headers = _auth_headers(client, "sdma.official@ps191.dev")
+    zones = client.get("/zones", headers=headers, params={"limit": 200}).json()["items"]
+    for zone in zones:
+        risk_pct = zone["risk_score_72h"] * 100
+        if zone["gsi_classification"] == "High":
+            assert risk_pct >= 65, f"{zone['display_code']}: GSI High but risk_score_72h={zone['risk_score_72h']} lands below the red/orange band"
+        elif zone["gsi_classification"] == "Moderate":
+            assert 45 <= risk_pct < 65, f"{zone['display_code']}: GSI Moderate but risk_score_72h={zone['risk_score_72h']} isn't in the amber band"
+
+
 def test_sdma_official_sees_all_seeded_zones(client):
     headers = _auth_headers(client, "sdma.official@ps191.dev")
     response = client.get("/zones", headers=headers)

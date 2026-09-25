@@ -7,15 +7,24 @@ vulnFactors()/prioFactors() arithmetic (including its exact per-factor
 Math.round-then-sum order) against app.seed's ZONES/HOUSEHOLDS fixtures,
 not derived from running this code — that's the point of the check.
 
-Priority expectations were recomputed (vuln expectations are untouched —
-vuln_score has no zone dependency) after a real seed-data bug fix, found
-by hand-verifying the forecast model in Docker: app.seed's ZONES previously
-carried each zone's risk_score_72h as the prototype's *6-hour* peak value
-(0.88/0.81/0.76/0.54), not its actual 72-hour value (0.41/0.48/0.36/0.31) —
-confirmed by comparing against ml/forecast_model.py's own training targets.
-Since risk_score_72h is prio_score's highest-weighted factor (32%), the
-corrected, roughly-halved risk values shift 6 of these 11 households down
-a tier (mostly immediate -> short_term) versus the old, inflated numbers.
+Priority expectations were recomputed twice after app.seed's ZONES
+risk_score_72h values (vuln expectations are untouched — vuln_score has no
+zone dependency):
+
+1. From the prototype's own 6-hour-peak values (0.88/0.81/0.76/0.54) to
+   ml/forecast_model.py's actual 72-hour training-curve output
+   (0.41/0.48/0.36/0.31) — a real mislabeling fix, found by hand-verifying
+   the forecast model in Docker.
+2. From that model-exact value to a GSI-derived demo baseline
+   (0.72/0.75/0.50/0.52) — reported live: every zone's 72h point is the low
+   end of a rain-triggered risk curve that peaks early and recedes by 72h
+   (the prototype's own agreed curve shape), so seeding the map's default
+   risk badge from it made a GSI-"High" zone display green/low-risk before
+   anyone touched the forecast feature. See app/seed.py's own comment on
+   ZONES for the full reasoning; the GSI columns themselves are unchanged.
+
+Since risk_score_72h is prio_score's highest-weighted factor (32%), each
+revision shifted several of these 11 households' tiers.
 """
 import pytest
 
@@ -60,17 +69,17 @@ def _household_dict(household_code: str) -> tuple[dict, str]:
 # household code -> (vuln_score, prio_score, prio_tier), hand-computed from
 # the prototype's own arithmetic (see module docstring).
 EXPECTED = {
-    "HH-112": (0.90, 0.71, "immediate"),
-    "HH-104": (0.65, 0.64, "short_term"),
-    "HH-107": (0.43, 0.58, "short_term"),
-    "HH-118": (0.10, 0.49, "short_term"),
-    "HH-203": (0.80, 0.74, "immediate"),
-    "HH-211": (0.35, 0.62, "short_term"),
-    "HH-219": (0.38, 0.63, "short_term"),
-    "HH-305": (0.73, 0.60, "short_term"),
-    "HH-309": (0.29, 0.48, "short_term"),
-    "HH-402": (0.31, 0.47, "medium_term"),
-    "HH-408": (0.60, 0.50, "short_term"),
+    "HH-112": (0.9, 0.81, "immediate"),
+    "HH-104": (0.65, 0.74, "immediate"),
+    "HH-107": (0.43, 0.68, "immediate"),
+    "HH-118": (0.1, 0.59, "short_term"),
+    "HH-203": (0.8, 0.83, "immediate"),
+    "HH-211": (0.35, 0.71, "immediate"),
+    "HH-219": (0.38, 0.72, "immediate"),
+    "HH-305": (0.73, 0.64, "short_term"),
+    "HH-309": (0.29, 0.52, "short_term"),
+    "HH-402": (0.31, 0.54, "short_term"),
+    "HH-408": (0.6, 0.57, "short_term"),
 }
 
 

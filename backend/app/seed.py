@@ -22,25 +22,35 @@ DISTRICT = {"name": "Dima Hasao", "state": "Assam", "primary_hazards": ["landsli
 
 # id, name, block, hazards, population, susp, gsi_classification, gsi_score, risk_72h, data_confidence, days_since_verified
 #
-# risk_72h below is each zone's actual 72-hour-horizon value from
-# ml/forecast_model.py's TRAINING_TARGETS_PCT (the prototype's forecastRow()
-# curve, rescaled 0-1) — ZN-01..04: 41/100, 48/100, 36/100, 31/100. An
-# earlier version of this seed used the *6-hour* peak value for all four
-# zones instead (0.88/0.81/0.76/0.54) — a real mislabeling, not a stylistic
-# choice: BACKEND-SCHEMA.md §5.3 defines risk_score_72h as "a denormalized
-# cache of the latest [72h] forecast," so seeding it from the 6h point
-# understated by roughly half how much clicking "Generate forecast" would
-# actually change the number, in the wrong direction for a judge to trust
-# what they're looking at before ever touching that feature. Verified by
-# hand against the trained model in Docker: predict_with_factors() at
-# horizon=72 for each zone's seeded susceptibility_score/placeholder
-# rainfall/slope returns 0.4098/0.4816/0.3595/0.3134 respectively — matching
-# these corrected values to within the model's own small fit error.
+# risk_72h below is a GSI-derived demo baseline (gsi_score/100 plus a small
+# offset), not ml/forecast_model.py's raw 72-hour training-curve output for
+# these zones (0.41/0.48/0.36/0.31). A previous revision of this seed used
+# that model-exact value — correct in the narrow sense of matching what
+# predict_with_factors() returns at horizon=72, and verified as such by
+# hand in Docker — but it created a real, reported problem: every one of
+# this district's zones has a rain-triggered risk curve that PEAKS early
+# (6-24h) and RECEDES by 72h (see ml/forecast_model.py's
+# TRAINING_TARGETS_PCT — the prototype's own agreed curve shape, not
+# something invented here), so the model's 72h point is *always* the low
+# end of the curve. Seeding the map's default/pre-"Generate" risk badge
+# from that specific point meant a zone GSI marks "High" displayed
+# green/low-risk on first load — confusing on its own, and specifically
+# reported as looking broken right after "Reset demo data", since that's
+# the demo's fresh-state default. Fixed by decoupling the two: the GSI
+# classification/score columns are unchanged (still the real, static,
+# dataset-sourced classification — TRD §8.1), but the *seeded* risk_72h
+# is now chosen to land in the same colour band as gsi_classification on
+# the map (riskColor.ts: >=65 red/orange for "High", 45-64 amber for
+# "Moderate") rather than to equal any one specific point on the model's
+# own trained curve. Clicking "Generate forecast" still calls the real
+# model and can legitimately show a different, lower number afterward —
+# that's the model's genuine output and is left alone; only the *default,
+# nobody's-touched-it-yet* baseline is curated for GSI-consistency here.
 ZONES = [
-    ("ZN-01", "Upper Ridge", "Haflong block · ward 4", ["landslide"], 412, 0.91, "High", 70, 0.41, "field_verified", 4),
-    ("ZN-02", "Riverbend East", "Maibang block · ward 2", ["flood"], 1240, 0.84, "High", 72, 0.48, "baseline", None),
-    ("ZN-03", "Slate Quarry", "Haflong block · ward 6", ["landslide", "cloudburst"], 268, 0.88, "Moderate", 45, 0.36, "field_verified", 12),
-    ("ZN-04", "Mill Colony", "Maibang block · ward 5", ["flood"], 890, 0.62, "Moderate", 48, 0.31, "due_for_reverification", 96),
+    ("ZN-01", "Upper Ridge", "Haflong block · ward 4", ["landslide"], 412, 0.91, "High", 70, 0.72, "field_verified", 4),
+    ("ZN-02", "Riverbend East", "Maibang block · ward 2", ["flood"], 1240, 0.84, "High", 72, 0.75, "baseline", None),
+    ("ZN-03", "Slate Quarry", "Haflong block · ward 6", ["landslide", "cloudburst"], 268, 0.88, "Moderate", 45, 0.50, "field_verified", 12),
+    ("ZN-04", "Mill Colony", "Maibang block · ward 5", ["flood"], 890, 0.62, "Moderate", 48, 0.52, "due_for_reverification", 96),
 ]
 
 # code, zone_code, population, children, elderly, assistance, structure, source(->data_confidence), days_since_surveyed
@@ -322,13 +332,16 @@ def seed() -> None:
 
         db.commit()
 
-        # Phase 11's one curated before/after pair — MinIO, not the DB, so
-        # this runs after the transaction commits rather than inside it.
-        ensure_sample_imagery_for_zone("ZN-01")
+        # Phase 11's curated before/after pairs, one per zone (migration
+        # 0010: stored in Postgres, not MinIO — no MinIO instance exists on
+        # the live deployment). Runs after the transaction commits rather
+        # than inside it, each call managing its own short-lived session.
+        for zone_code in zones_by_code:
+            ensure_sample_imagery_for_zone(zone_code)
 
         print(f"Seeded district {district.name}, {len(ZONES)} zones, {len(HOUSEHOLDS)} households, "
               f"{len(SHELTERS)} shelters, {len(VEHICLES)} vehicles, {len(ESCORTS)} escorts, 1 route, "
-              f"{len(SEED_USERS)} users (password: {SEED_PASSWORD}), sample imagery for ZN-01.")
+              f"{len(SEED_USERS)} users (password: {SEED_PASSWORD}), sample imagery for all {len(ZONES)} zones.")
     finally:
         db.close()
 
