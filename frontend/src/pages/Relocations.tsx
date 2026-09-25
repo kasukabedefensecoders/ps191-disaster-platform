@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { SampleDataBadge, TierBadge } from "../components/badges";
-import { fetchRelocationsByVehicle, updateRelocationStatus, type RelocationRecord, type VehicleGroup } from "../lib/api";
+import VehicleRouteModal from "../components/VehicleRouteModal";
+import {
+  fetchRelocationsByVehicle,
+  fetchShelters,
+  fetchZoneHouseholds,
+  fetchZones,
+  updateRelocationStatus,
+  type HouseholdRanked,
+  type RelocationRecord,
+  type Shelter,
+  type VehicleGroup,
+  type Zone,
+} from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 
 const STATUS_META: Record<RelocationRecord["status"], { label: string; color: string; next: RelocationRecord["status"] | null; action: string | null }> = {
@@ -41,6 +52,41 @@ function vehicleIcon(vehicleType: string | null): string {
   }
 }
 
+// A vehicle's pickup point for "View Route" — the households on one
+// vehicle can come from several zones at once (demo_seed.py's VEHICLE_PLAN
+// deliberately consolidates a few, e.g. BUS-02 carries one ZN-01 and one
+// ZN-02 household to SH-02), so there's no single zone this can always
+// point at. Every household in the same zone shares that zone's own
+// seeded point (app/seed.py's HOUSEHOLDS all use ZONE_CENTROIDS), so this
+// dedupes by zone and averages the distinct zone points — a genuine
+// "roughly where this run is collecting from" location to hand to OSRM,
+// not a fabricated single-household address.
+function pickupPointForGroup(
+  group: VehicleGroup,
+  householdsById: Record<string, HouseholdRanked>,
+  zonesById: Record<string, Zone>,
+): { point: [number, number]; label: string } | null {
+  const zonePoints = new Map<string, [number, number]>();
+  for (const h of group.households) {
+    const hh = householdsById[h.household_id];
+    if (hh && !zonePoints.has(hh.zone_id)) zonePoints.set(hh.zone_id, hh.geom.coordinates);
+  }
+  if (zonePoints.size === 0) return null;
+
+  const zoneIds = [...zonePoints.keys()];
+  const points = [...zonePoints.values()];
+  const avgLon = points.reduce((s, p) => s + p[0], 0) / points.length;
+  const avgLat = points.reduce((s, p) => s + p[1], 0) / points.length;
+
+  const zoneLabels = zoneIds.map((zid) => zonesById[zid]?.display_code ?? zid);
+  const label =
+    zoneIds.length === 1
+      ? `${zoneLabels[0]} · ${zonesById[zoneIds[0]]?.name ?? ""} (pickup)`.trim()
+      : `${zoneLabels.join(", ")} (pickup — ${group.households.length} households)`;
+
+  return { point: [avgLon, avgLat], label };
+}
+
 /** Change 3: the Logistics Tracker's bus-consolidation cards — several
  * households sharing one vehicle, grouped server-side by GET /relocations/
  * by-vehicle (services/relocations.py's group_relocations_by_vehicle).
@@ -49,11 +95,14 @@ function vehicleIcon(vehicleType: string | null): string {
  * many active runs doesn't turn into a wall of buttons. */
 export default function Relocations() {
   const { token, user } = useAuth();
-  const navigate = useNavigate();
   const [groups, setGroups] = useState<VehicleGroup[] | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [householdsById, setHouseholdsById] = useState<Record<string, HouseholdRanked>>({});
+  const [zonesById, setZonesById] = useState<Record<string, Zone>>({});
+  const [sheltersById, setSheltersById] = useState<Record<string, Shelter>>({});
+  const [viewingRouteFor, setViewingRouteFor] = useState<VehicleGroup | null>(null);
 
   const load = () => {
     if (!token) return;
@@ -63,6 +112,26 @@ export default function Relocations() {
   };
 
   useEffect(load, [token]);
+
+  // "View Route" needs each household's own zone_id/geom (not returned by
+  // /relocations/by-vehicle at all) and each shelter's geom (that endpoint
+  // only sends display_code/name) — fetched once, same pattern
+  // FieldLogistics.tsx already uses for the same household-lookup need.
+  useEffect(() => {
+    if (!token) return;
+    fetchShelters(token)
+      .then((r) => setSheltersById(Object.fromEntries(r.items.map((s) => [s.shelter_id, s]))))
+      .catch(() => {});
+    fetchZones(token)
+      .then(async (r) => {
+        setZonesById(Object.fromEntries(r.items.map((z) => [z.zone_id, z])));
+        const entries = await Promise.all(
+          r.items.map(async (z) => (await fetchZoneHouseholds(token, z.zone_id).catch(() => ({ items: [] }))).items),
+        );
+        setHouseholdsById(Object.fromEntries(entries.flat().map((h) => [h.household_id, h])));
+      })
+      .catch(() => {});
+  }, [token]);
 
   const toggle = (key: string) => {
     setExpanded((prev) => {
@@ -199,7 +268,17 @@ export default function Relocations() {
                         {busyKey === key ? "Updating…" : meta.action}
                       </button>
                     )}
-                    <button onClick={() => navigate("/routes")} className="ps-btn-outline" style={outlineButtonStyle}>
+                    <button
+                      onClick={() => setViewingRouteFor(group)}
+                      disabled={!pickupPointForGroup(group, householdsById, zonesById) || !sheltersById[group.households[0]?.shelter_id ?? ""]}
+                      title={
+                        pickupPointForGroup(group, householdsById, zonesById) && sheltersById[group.households[0]?.shelter_id ?? ""]
+                          ? undefined
+                          : "Loading route data…"
+                      }
+                      className="ps-btn-outline"
+                      style={outlineButtonStyle}
+                    >
                       View Route
                     </button>
                   </div>
@@ -209,6 +288,31 @@ export default function Relocations() {
           );
         })}
       </div>
+
+      {viewingRouteFor && (() => {
+        const pickup = pickupPointForGroup(viewingRouteFor, householdsById, zonesById);
+        const shelterId = viewingRouteFor.households[0]?.shelter_id;
+        const shelter = shelterId ? sheltersById[shelterId] : undefined;
+        // The button that opens this is disabled until both resolve, so
+        // this guard is only ever hit if data changed out from under an
+        // already-open modal (e.g. a reset) — closing quietly beats
+        // rendering a route to [0, 0].
+        if (!pickup || !shelter) return null;
+
+        const title = `${viewingRouteFor.vehicle_display_code ?? "Unassigned"}${viewingRouteFor.route_label ? ` (${viewingRouteFor.route_label})` : ""}`;
+
+        return (
+          <VehicleRouteModal
+            key={viewingRouteFor.vehicle_id ?? "unassigned"}
+            title={title}
+            originLabel={pickup.label}
+            destLabel={`${shelter.display_code} · ${shelter.name}`}
+            origin={pickup.point}
+            dest={shelter.geom.coordinates}
+            onClose={() => setViewingRouteFor(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
