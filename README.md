@@ -14,7 +14,7 @@ The pilot build also runs as three separately-hosted services (see [`docs/TRD.md
 - **Main app** — SDMA official / field officer / shelter officer / control room dashboards (Vercel): https://ps191-disaster-platform.vercel.app
 - **Field survey PWA** (Vercel): https://ps191-field-app.vercel.app
 
-This deployment has no Redis, MinIO or OSRM instance behind it (see TRD §11's "known gaps" note) — routing, object storage and live-feed caching remain local-Compose-only for now.
+This deployment has no self-hosted Redis, MinIO or OSRM instance behind it (see TRD §11's "known gaps" note) — object storage and live-feed caching remain local-Compose-only for now, and shelter-matching's own distance/duration is still a straight-line estimate. Evacuation Routes and Logistics Tracker's "View Route" are the exception: both fetch real road-routed paths client-side from OSRM's public demo API (`frontend/src/lib/osrm.ts`), no self-hosted engine required.
 
 ## Stack
 

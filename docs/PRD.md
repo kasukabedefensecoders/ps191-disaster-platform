@@ -125,6 +125,8 @@ Turns an allocation decision into an actual move: assigns vehicles/transport cap
 
 Recommends a route to the assigned shelter, flagging roads known or suspected to be blocked or unsafe. During an active event, blocked-road status can be informed by satellite/SAR-based change detection when ground verification isn't possible.
 
+***Resolved:*** *the route shown is a genuine road-following path with real distance/ETA, not a straight line — the Evacuation Routes screen and Logistics Tracker's "View Route" both fetch it client-side from OSRM's free public routing API (`frontend/src/lib/osrm.ts`), which sidesteps needing a self-hosted OSRM instance (`docs/TRD.md` §11's still-open gap) for this specific requirement. Falls back to a straight line, clearly labeled, if that public service is ever unreachable — see `docs/BUILD-PLAN.md` Phase 7.*
+
 ### 7.8 Central Disaster Management Dashboard
 
 Single view for authorities showing: critical zones, affected households, immediate relocation needs, shelter availability/capacity, blocked routes, and outstanding medical/rescue needs. The dashboard opens on a landing/summary screen — the first thing an authority sees on login: a high-level snapshot of critical zones, active alerts, and pending relocations — before they drill into any specific zone or household. This keeps the platform authority-only in scope (no separate public-facing page) while still giving a genuine at-a-glance overview.
@@ -132,6 +134,8 @@ Single view for authorities showing: critical zones, affected households, immedi
 ### 7.9 Predictive Risk Forecasting
 
 A rolling ~72-hour risk score per zone, combining live triggering-condition data (rainfall for landslide/cloudburst risk, river levels for flood risk, cyclone/storm-surge data for coastal risk) with each zone's static hazard-susceptibility baseline, so relocation can be pre-staged ahead of the event rather than started after it.
+
+***Resolved:*** *a raw score and a `factors[]` array (rule 1) aren't, by themselves, a decision a non-technical district official can act on quickly — the 72-hour forecast screen pairs each generated score with a plain-language panel: one line per contributing factor, what the 0–100 scale means, and a highlighted recommended action for the zone's current peak value (below 28 monitor only; 28–44 monitor closely; 45–64 alert and prepare shelters; 65–79 begin phased relocation; 80+ immediate/emergency relocation). Those thresholds are `frontend/src/lib/riskColor.ts`'s own severity-band breakpoints, so the guidance can never recommend an action the Red Zone Map's colour for the same score would contradict.*
 
 ### 7.10 Field Officer Survey Module
 
