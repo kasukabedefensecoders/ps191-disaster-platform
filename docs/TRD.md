@@ -129,7 +129,7 @@ PostGIS is used for every table with a spatial dimension. Below are the core ent
 | shelters | shelter_id, geom (POINT), max_capacity, current_occupancy, facilities (JSONB), status | §7.4 |
 | surveys | survey_id, zone_id (FK), officer_id (FK), submitted_at, payload (JSONB), photo_url, geotag (POINT), review_status | Offline-captured, synced; §7.10 |
 | relocation_records | record_id, household_id (FK), shelter_id (FK), priority_tier, route_id (FK), status, vehicle_id, escort_id, timestamps | §7.5, §7.6 |
-| routes | route_id, origin_geom, dest_geom, path (LINESTRING), blocked_segments (JSONB), updated_at | §7.7 |
+| routes | route_id, zone_id (FK), shelter_id (FK), origin_geom, dest_geom, path (LINESTRING), distance_km, estimated_duration_minutes, blocked_segments (JSONB), updated_at | §7.7 — `zone_id`/`shelter_id` added migrations 0012/0013: one route per zone, to a named shelter, not an unscoped named route |
 | risk_forecasts | forecast_id, zone_id (FK), horizon_hours, score, factors (JSONB), generated_at | Rolling 72h score; §7.9 |
 | change_detections | detection_id, zone_id (FK), before_image_ref, after_image_ref, detected_at, affected_area_geom, cross_referenced_survey_ids[] | §7.11 |
 | handoff_logs | log_id, need_type, agency, status, linked_record_id, timestamps | §7.13 |
